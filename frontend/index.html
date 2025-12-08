@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>つぶなび モック</title>
+  <nk rel="icon" href="../image/logo_placeholder.svg">
+  <nk rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="../image/logo_placeholder.svg" alt="つぶなび" class="logo">
+      <div class="user-info">
+        <div class="user-name">田中 健太（SESエンジニア / 入社3年目）</div>
+        <div class="user-actions"><button type="button" class="ghost-btn">ログアウト</button></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="column left">
+      <section class="card" data-section="tweet-log">
+        <header class="section-header">
+          <h2>Tweet &amp; Log（日々の冒険とログ）</h2>
+        </header>
+        <div class="tweet-input">
+          <label class="sr-only" for="tweet-text">今日のつぶやき</label>
+          <textarea id="tweet-text" placeholder="今日の現場で感じたこと、学んだことをつぶやこう（140文字以内）" maxlength="140"></textarea>
+          <div class="tweet-controls">
+            <label class="radio">
+              <input type="radio" name="visibity" value="private" checked>
+              <span>社内限定</span>
+            </label>
+            <label class="radio">
+              <input type="radio" name="visibity" value="pubc">
+              <span>公開</span>
+            </label>
+            <button id="tweet-submit" type="button" class="primary-btn">送信</button>
+          </div>
+        </div>
+        <div class="card muted" id="analysis-card">
+          <div class="label">直近の解析結果</div>
+          <div class="analysis-content">
+            <div><span class="mono" id="analysis-points">経験値: +0pt</span></div>
+            <div><span class="mono" id="analysis-skills">抽出スキルタグ: -</span></div>
+            <div><span class="mono" id="analysis-stance">抽出スタンスタグ: -</span></div>
+            <div class="note">これはロードマップに即時反映済みの値です。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" data-section="recent-tweets">
+        <header class="section-header">
+          <h3>最近のつぶやきリスト</h3>
+        </header>
+        <div id="tweet-st" class="st"></div>
+      </section>
+
+      <section class="card" data-section="daily-sync">
+        <header class="section-header">
+          <h3>Daily Sync（振り返りサマリー）</h3>
+        </header>
+        <div class="daily-row">
+          <div class="label">今日の経験値獲得レポート</div>
+          <div class="mono" id="daily-total">Total: +0pt</div>
+        </div>
+        <div class="draft" id="daily-draft">日報ドラフトをここに表示します。</div>
+      </section>
+    </section>
+
+    <section class="column right">
+      <section class="card" data-section="roadmap">
+        <header class="section-header">
+          <h2>My Career Roadmap（動的キャリア地図）</h2>
+        </header>
+        <div id="will-box" class="will-box"></div>
+        <div id="skills" class="skills"></div>
+        <div class="note">可能性の交差点: ヒント: 今のスキル傾向なら「技術特化のスペシャリスト」ルートも狙えます。</div>
+      </section>
+
+      <section class="card" data-section="match">
+        <header class="section-header">
+          <h3>Match &amp; Consult（ナナメのつながり）</h3>
+        </header>
+        <div class="tags" id="match-tags"></div>
+        <div id="matches" class="st"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>

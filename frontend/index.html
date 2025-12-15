@@ -3,22 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>つぶなび モック</title>
-  <nk rel="icon" href="../image/logo_placeholder.svg">
-  <nk rel="stylesheet" href="./style.css" />
+  <title>つぶなび | Tweet &amp; Log 専用ビュー</title>
+  <link rel="icon" href="../image/logo_placeholder.svg">
+  <link rel="stylesheet" href="./style.css" />
+  <script src="./config.js" defer></script>
+  <script src="./tweet.js" defer></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <img src="../image/logo_placeholder.svg" alt="つぶなび" class="logo">
       <div class="user-info">
-        <div class="user-name">田中 健太（SESエンジニア / 入社3年目）</div>
-        <div class="user-actions"><button type="button" class="ghost-btn">ログアウト</button></div>
+        <div class="user-name">Tweet &amp; Log 専用ビュー</div>
       </div>
     </div>
+    <div id="api-status" class="pill" style="background:#e3edff;color:#1e4db7;">API: -</div>
   </header>
 
-  <main class="layout">
+  <main class="layout" style="grid-template-columns: 1fr;">
     <section class="column left">
       <section class="card" data-section="tweet-log">
         <header class="section-header">
@@ -29,11 +31,11 @@
           <textarea id="tweet-text" placeholder="今日の現場で感じたこと、学んだことをつぶやこう（140文字以内）" maxlength="140"></textarea>
           <div class="tweet-controls">
             <label class="radio">
-              <input type="radio" name="visibity" value="private" checked>
+              <input type="radio" name="visibility" value="private" checked>
               <span>社内限定</span>
             </label>
             <label class="radio">
-              <input type="radio" name="visibity" value="pubc">
+              <input type="radio" name="visibility" value="public">
               <span>公開</span>
             </label>
             <button id="tweet-submit" type="button" class="primary-btn">送信</button>
@@ -54,41 +56,22 @@
         <header class="section-header">
           <h3>最近のつぶやきリスト</h3>
         </header>
-        <div id="tweet-st" class="st"></div>
+        <div id="tweet-list" class="list"></div>
       </section>
 
-      <section class="card" data-section="daily-sync">
+      <section class="card" data-section="report">
         <header class="section-header">
-          <h3>Daily Sync（振り返りサマリー）</h3>
+          <h3>日報草案</h3>
         </header>
-        <div class="daily-row">
-          <div class="label">今日の経験値獲得レポート</div>
-          <div class="mono" id="daily-total">Total: +0pt</div>
+        <div class="report-controls">
+          <label>日付:
+            <input type="date" id="report-date">
+          </label>
+          <button id="report-generate" type="button" class="primary-btn">日報を作成</button>
         </div>
-        <div class="draft" id="daily-draft">日報ドラフトをここに表示します。</div>
-      </section>
-    </section>
-
-    <section class="column right">
-      <section class="card" data-section="roadmap">
-        <header class="section-header">
-          <h2>My Career Roadmap（動的キャリア地図）</h2>
-        </header>
-        <div id="will-box" class="will-box"></div>
-        <div id="skills" class="skills"></div>
-        <div class="note">可能性の交差点: ヒント: 今のスキル傾向なら「技術特化のスペシャリスト」ルートも狙えます。</div>
-      </section>
-
-      <section class="card" data-section="match">
-        <header class="section-header">
-          <h3>Match &amp; Consult（ナナメのつながり）</h3>
-        </header>
-        <div class="tags" id="match-tags"></div>
-        <div id="matches" class="st"></div>
+        <textarea id="report-draft" class="report-draft" readonly placeholder="ここに日報草案が表示されます"></textarea>
       </section>
     </section>
   </main>
-
-  <script src="./app.js"></script>
 </body>
 </html>

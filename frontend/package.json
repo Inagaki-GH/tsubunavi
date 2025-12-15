@@ -4,6 +4,7 @@
   "main": "app.js",
   "scripts": {
     "dev": "lite-server",
+    "dev:tweet": "lite-server --config bs-config-tweet.json",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

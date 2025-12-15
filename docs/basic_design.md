@@ -77,6 +77,19 @@ visibility仕様
 1) `npm run dev`でサーバ起動 → 初期`fetch` → stateセット → 各セクションをrender
 2) 投稿フォームでつぶやき入力 → ルール抽出 → state更新 → render
 
+インフラ/スタブ方針
+- 本番想定: フロントは S3 + CloudFront（静的配信）、API は API Gateway + Lambda、データは DynamoDB、LLMは Bedrock を想定。
+- ローカル検証: フロントは `npm run dev` のみで完結。API呼び出しは行わず `API_MODE=stub` 前提のローカルスタブレスポンス、AIも `AI_MODE=stub` で固定応答。
+- スタブ実装: `apiClient` を一箇所に置き、`API_MODE=stub|aws` / `AI_MODE=stub|bedrock` で切替。stub時はハードコードレスポンス、AWS時はAPI Gateway/Bedrockを呼ぶ。
+- CORS/接続: AWS接続時は `http://localhost:3000` をCORS許可。認証情報をフロントに埋め込まない（将来はCognito等で取得）。
+- データ永続: ローカルは localStorage でTweetのみ永続。DynamoDB接続は後続フェーズで同インターフェースに差し替える。
+
+認証方針（Cognito）
+- フロー: Authorization Code + PKCE を採用（Implicit/ROPCは非採用）。Cognito標準ドメインを使用し、クライアントはパブリックのみ。
+- リダイレクト: ローカル `http://localhost:3000`、本番は CloudFront ドメインを Callback/Logout として登録。ログアウトパスは `/logout/` を使用。
+- 構成: ユーザプールは email + username。外部IdPなし、ポリシーはデフォルト（必要に応じてMFA等は後日設定）。
+- トークン管理: フロントでは`sessionStorage`/メモリ利用を前提に、リフレッシュトークンを取得する構成を想定（セキュリティ重視で`localStorage`は避ける）。
+
 フィクスチャJSONサンプル（`fixtures/`）
 - skills.json
 ```json

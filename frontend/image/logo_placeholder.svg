@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" role="img" aria-labelledby="title desc">
+  <title id="title">Tsubunavi Logo Placeholder</title>
+  <desc id="desc">Simple blue accent logo placeholder for Tsubunavi mock</desc>
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e4db7"/>
+      <stop offset="100%" stop-color="#2e8fff"/>
+    </linearGradient>
+  </defs>
+  <rect width="240" height="60" rx="12" fill="#0c1b3a"/>
+  <circle cx="30" cy="30" r="18" fill="url(#g)"/>
+  <path d="M22 30c4-6 8-6 12 0-4 6-8 6-12 0Z" fill="#e9f2ff"/>
+  <text x="60" y="36" fill="#e9f2ff" font-family="Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="0.5">つぶなび</text>
+</svg>

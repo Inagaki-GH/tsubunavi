@@ -6,6 +6,8 @@
   <title>つぶなび | Tweet &amp; Log 単体</title>
   <link rel="icon" href="../image/logo_placeholder.svg">
   <link rel="stylesheet" href="./style.css" />
+  <script src="./config.js" defer></script>
+  <script src="./tweet.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -15,6 +17,7 @@
         <div class="user-name">Tweet &amp; Log 専用ビュー</div>
       </div>
     </div>
+    <div id="api-status" class="pill" style="background:#e3edff;color:#1e4db7;">API: -</div>
   </header>
 
   <main class="layout" style="grid-template-columns: 1fr;">
@@ -54,6 +57,19 @@
           <h3>最近のつぶやきリスト</h3>
         </header>
         <div id="tweet-list" class="list"></div>
+      </section>
+
+      <section class="card" data-section="report">
+        <header class="section-header">
+          <h3>日報草案</h3>
+        </header>
+        <div class="report-controls">
+          <label>日付:
+            <input type="date" id="report-date">
+          </label>
+          <button id="report-generate" type="button" class="primary-btn">日報を作成</button>
+        </div>
+        <textarea id="report-draft" class="report-draft" readonly placeholder="ここに日報草案が表示されます"></textarea>
       </section>
     </section>
   </main>

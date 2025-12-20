@@ -158,6 +158,14 @@ body {
 .report-controls input[type="date"] { padding: 6px; border: 1px solid var(--border); border-radius: 8px; }
 .report-draft { width: 100%; min-height: 140px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; resize: vertical; background: #f8fbff; }
 
+.ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.ai-panel { display: flex; flex-direction: column; gap: 10px; }
+.ai-panel label { font-size: 13px; color: #1e2a3a; }
+.ai-input { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.code-area { width: 100%; min-height: 260px; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 13px; color: #203046; background: #fbfcfe; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+.ai-actions { display: flex; gap: 8px; align-items: center; }
+.ai-status { font-size: 12px; color: #51607a; }
+
 .sr-only {
   position: absolute;
   width: 1px; height: 1px;
@@ -168,4 +176,8 @@ body {
 
 @media (max-width: 960px) {
   .layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+  .ai-grid { grid-template-columns: 1fr; }
 }

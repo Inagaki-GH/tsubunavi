@@ -19,4 +19,5 @@ terraform apply \
   -var-file="${TFVARS_FILE}" \
   -target=aws_lambda_function.tweets \
   -target=aws_lambda_function.report \
+  -target=aws_lambda_function.ai_execute \
   -auto-approve

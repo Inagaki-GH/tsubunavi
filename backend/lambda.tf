@@ -102,6 +102,38 @@ resource "aws_iam_role_policy" "report_lambda" {
   policy = data.aws_iam_policy_document.report_lambda_policy.json
 }
 
+resource "aws_iam_role" "ai_lambda" {
+  name               = "${var.project}-${var.env}-ai-lambda-role"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
+
+  tags = {
+    Project = var.project
+    Env     = var.env
+  }
+}
+
+data "aws_iam_policy_document" "ai_lambda_policy" {
+  statement {
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+    ]
+    resources = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"]
+  }
+
+  statement {
+    actions   = ["bedrock:InvokeModel"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "ai_lambda" {
+  name   = "${var.project}-${var.env}-ai-lambda-policy"
+  role   = aws_iam_role.ai_lambda.id
+  policy = data.aws_iam_policy_document.ai_lambda_policy.json
+}
+
 data "aws_caller_identity" "current" {}
 
 resource "aws_lambda_function" "tweets" {
@@ -151,6 +183,29 @@ resource "aws_lambda_function" "report" {
   }
 }
 
+resource "aws_lambda_function" "ai_execute" {
+  function_name = "${var.project}-${var.env}-ai-execute"
+  role          = aws_iam_role.ai_lambda.arn
+  handler       = "ai_execute.handler"
+  runtime       = "nodejs24.x"
+  timeout       = 30
+
+  filename         = data.archive_file.lambda_zip.output_path
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+
+  environment {
+    variables = {
+      BEDROCK_MODEL_ID = var.bedrock_model_id
+      SHARED_TOKEN     = var.shared_token
+    }
+  }
+
+  tags = {
+    Project = var.project
+    Env     = var.env
+  }
+}
+
 resource "aws_apigatewayv2_api" "http" {
   name          = "${var.project}-${var.env}-api"
   protocol_type = "HTTP"
@@ -179,6 +234,14 @@ resource "aws_apigatewayv2_integration" "report" {
   payload_format_version = "2.0"
 }
 
+resource "aws_apigatewayv2_integration" "ai_execute" {
+  api_id                 = aws_apigatewayv2_api.http.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.ai_execute.invoke_arn
+  integration_method     = "POST"
+  payload_format_version = "2.0"
+}
+
 resource "aws_apigatewayv2_route" "get_tweets" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "GET /tweets"
@@ -195,6 +258,12 @@ resource "aws_apigatewayv2_route" "post_reports" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "POST /reports"
   target    = "integrations/${aws_apigatewayv2_integration.report.id}"
+}
+
+resource "aws_apigatewayv2_route" "post_ai_execute" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /ai/execute"
+  target    = "integrations/${aws_apigatewayv2_integration.ai_execute.id}"
 }
 
 resource "aws_apigatewayv2_stage" "default" {
@@ -217,4 +286,12 @@ resource "aws_lambda_permission" "apigw_report" {
   function_name = aws_lambda_function.report.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*/reports"
+}
+
+resource "aws_lambda_permission" "apigw_ai_execute" {
+  statement_id  = "AllowAPIGatewayInvokeAiExecute"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.ai_execute.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*/ai/execute"
 }

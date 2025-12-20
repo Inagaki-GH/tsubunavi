@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>つぶなび | AI 実行コンソール</title>
+  <link rel="icon" href="../image/logo_placeholder.svg">
+  <link rel="stylesheet" href="./style.css" />
+  <script src="./config.js" defer></script>
+  <script src="./ai.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="../image/logo_placeholder.svg" alt="つぶなび" class="logo">
+      <div class="user-info">
+        <div class="user-name">AI 実行コンソール</div>
+        <div class="user-role">汎用Bedrock呼び出し検証</div>
+      </div>
+    </div>
+    <div class="ai-actions">
+      <a class="pill" href="./tweet.html">Tweet &amp; Log</a>
+      <div id="api-status" class="pill" style="background:#e3edff;color:#1e4db7;">API: -</div>
+    </div>
+  </header>
+
+  <main class="layout" style="grid-template-columns: 1fr;">
+    <section class="column left">
+      <section class="card">
+        <header class="section-header">
+          <h2>Bedrock 汎用実行</h2>
+        </header>
+        <div class="ai-grid">
+          <div class="ai-panel">
+            <label for="ai-model">model_id（任意）</label>
+            <input id="ai-model" class="ai-input" type="text" placeholder="未指定ならLambda側のデフォルトを使用">
+            <label for="ai-payload">payload（JSON）</label>
+            <textarea id="ai-payload" class="code-area" placeholder='{"anthropic_version":"bedrock-2023-05-31","messages":[{"role":"user","content":"今日の学びを1文で要約して"}]}'></textarea>
+            <div class="ai-actions">
+              <button id="ai-submit" type="button" class="primary-btn">実行</button>
+              <button id="ai-reset" type="button" class="ghost-small">サンプル復元</button>
+              <span id="ai-status" class="ai-status">-</span>
+            </div>
+          </div>
+          <div class="ai-panel">
+            <label for="ai-response">response</label>
+            <textarea id="ai-response" class="code-area" readonly placeholder="ここにBedrockのレスポンスが表示されます"></textarea>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

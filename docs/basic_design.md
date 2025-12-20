@@ -84,6 +84,22 @@ visibility仕様
 - CORS/接続: AWS接続時は `http://localhost:3000` をCORS許可。認証情報をフロントに埋め込まない（将来はCognito等で取得）。
 - データ永続: ローカルは localStorage でTweetのみ永続。DynamoDB接続は後続フェーズで同インターフェースに差し替える。
 
+Bedrock汎用Lambda（ゲートウェイ）方針
+- 目的: フロントがプロンプトを構成し、LambdaがBedrock呼び出しを代理することで、署名・許可・制限をサーバ側に集約する。
+- 使い分け: 相談モードや日報生成など、LLM呼び出しが必要な機能は汎用Lambdaに統一して委譲する想定。
+- リクエスト責務（フロント）:
+  - `use_case`（例: `consult`, `report`）と入力本文を渡す。
+  - 必要に応じて `model_id` を指定するが、許容モデルはサーバ側のallowlistで制限。
+- リクエスト責務（Lambda）:
+  - 認証トークン検証（フロントに秘匿情報は持たせない）。
+  - `model_id`/`max_tokens`/`temperature` などの範囲チェック。
+  - Bedrock呼び出し結果を共通フォーマットで返却（`text`, `usage`, `model_id`, `request_id`）。
+- 例: `POST /ai/execute`
+  - body: `{ "use_case": "report", "input": "...", "model_id": "anthropic.claude-3-5-sonnet-20240620-v1:0" }`
+  - response: `{ "text": "...", "model_id": "...", "usage": { "input_tokens": 0, "output_tokens": 0 } }`
+- 既存APIとの整合:
+  - 日報生成は暫定で専用エンドポイント（`POST /reports`）を持ち、将来的に汎用Lambdaへ統合する。
+
 認証方針（Cognito）
 - フロー: Authorization Code + PKCE を採用（Implicit/ROPCは非採用）。Cognito標準ドメインを使用し、クライアントはパブリックのみ。
 - リダイレクト: ローカル `http://localhost:3000`、本番は CloudFront ドメインを Callback/Logout として登録。ログアウトパスは `/logout/` を使用。

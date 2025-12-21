@@ -2,42 +2,36 @@
 ==================================
 
 概要
-- 外部SaaS/LLM APIなし、Node 24系（現行LTS） + 静的HTML/CSS/JSで完結。
-- サーバは`npm run dev`で`lite-server`を起動し`http://localhost`配信（ライブリロード付き）。`file://`は禁止（CORS回避）。
-- フレームワーク/ライブラリ不使用。ESM非使用でも動く1ファイルJS前提。外部CDNやフォントは使わない。
-- パッケージ方針: 依存は最小（`lite-server`のみ想定）。バージョンは常に最新安定（LTS系）を採用し、固定しない。
+- 日々の「つぶやき」からタスク抽出・感情分析・日報生成を行うキャリア支援プロダクト。
+- 3画面構成（ホーム/あしあとと里/夜の焚火広場）で、成長可視化と匿名エール体験を提供する。
 
-画面分割
-- `index.html`にセクションを固定配置（Hero / My Career Roadmap / Tweet & Log / Match & Consult / Daily Sync）。
-- `app.js`でセクションのルートDOMを取得し、描画関数で中身を差し替える。
+画面構成（MVP）
+- `home_tsubunavi.html`: つぶやき・タスク・日報・エール通知をまとめたホーム。
+- `forest_tsubunavi.html`: あしあとと里（スキル可視化/探索マップ）。
+- `bonfire_premium.html`: 夜の焚火広場（匿名エール/応援体験）。
 
 画面設計（UI構成イメージ）
-- レイアウト: 横2カラム（左: Tweet & Log / Daily / 最近のつぶやき、右: Roadmap / Match）。PC幅想定、モバイルは縦並びに崩してOK。
-- Tweet & Logセクション
-  - 入力: テキストエリア（プレースホルダ「今日の現場で感じたこと、学んだことをつぶやこう（140文字以内）」）。
-  - 公開範囲: ラジオ（社内限定/公開）。
-  - モード選択: 「メモモード（蓄積のみ/AI応答なし）」と「相談モード（AI応答あり）」をラジオなどで切替。ローカルモックでは相談モードはスタブ応答を表示するのみ。
-  - 送信ボタン、直近解析結果カード（経験値、抽出スキルタグ、スタンスタグを列挙）。
-  - 最近のつぶやきリスト: 日付+本文のカードリスト。
-- My Career Roadmap
-  - Will表示: Goal/期間/現在ステータスをテキストで表示。
-  - スキルバー: 各スキルのベース値バー（pt表記）と「今日+Xpt」の上乗せバーを色分け表示。
-  - 交差点メモ: 別ルート提案の短文（例: 「技術特化のスペシャリストルートも狙えます」）。
-- Match & Consult
-  - 共通タグ表示（例: 顧客折衝、課題分解、フロント志向）。
-  - 候補カード: 顔写真（省略可）、氏名/役職/共通タグ、メッセージ案ボタン。
-  - メッセージ案モーダル: 定型文を表示するだけで送信なし。
-- Daily Sync（任意）
-  - 初期表示あり。初期値は+0ptとする。
-  - 今日の経験値獲得レポート（例: Total:+25pt）。
-  - 日報ドラフトのダミーテキストを表示。
+- ホーム（home_tsubunavi.html）
+  - つぶやき投稿: 自由入力、リアルタイムで感情/タスク分析。
+  - AIタスク整形: つぶやきからタスク化（例: 「API設計書を作成する予定」→「API設計書の作成」）。
+  - タスクボード: 3カラム（待機中/実施中/完了）。ドラッグ&ドロップで更新。
+  - 日報自動生成: つぶやき履歴とタスクをまとめて要約。
+  - エール通知: 「◯名からエールが届いています」を表示（一定時間で消去）。
+- あしあとと里（forest_tsubunavi.html）
+  - スキル可視化: 里ごとにスキルをグループ化し、開拓済み/未開拓を区別。
+  - 足跡システム: 成長の軌跡を表示し、クリックで詳細表示。
+- 夜の焚火広場（bonfire_premium.html）
+  - ピックアップ先人: 類似スキルの先人を提示。
+  - さまよえる子羊: タスク滞留者の匿名表示。
+  - エール送信: 3種類のエールボタン（💪/🔥/🌟）。送信数のみカウント。
 
-状態モデル（app.js）
-- `state.skills`: fixturesのスキルノード配列 `{id,name,category,level,delta_today,recommended_action}`
-- `state.tweets`: つぶやき配列 `{id,text,visibility,mode,extracted_skills,extracted_stance,gained_points,ai_reply?}`
-- `state.matches`: マッチ候補配列 `{id,name,role,common_tags,message_suggestion}`
-- `state.will`: Will設定 `{goal_role,timeline,traits}` を固定値で保持
-- `state.tweetInput`: 投稿フォームの一時値（text, visibility, mode）
+状態モデル（MVP）
+- `state.tweets`: つぶやき配列 `{id,text,emotion,tasks[],created_at}`
+- `state.tasks`: タスク配列 `{id,title,status}`（待機中/実施中/完了）
+- `state.report`: 日報草案 `{date,summary,tasks_by_category[],insights}`
+- `state.cheers`: エール通知 `{count,updated_at}`
+- `state.villages`: 里/スキル構成 `{id,name,level,locked}`
+- `state.footprints`: 足跡ログ `{id,village_id,detail}`
 
 フィクスチャ読み込み
 - 起動時に`fetch('./fixtures/skills.json')`等で読み込み、`Promise.all`完了後に初期描画。
@@ -50,12 +44,9 @@
 - `renderDaily(state)`: 今日の経験値サマリと日報ドラフトを表示（任意セクション）。
 - `handleTweetSubmit()`: 入力テキストをルールベースでタグ抽出 → `delta_today`更新 → 各描画を再実行。
 
-タグ抽出ルール例（app.jsにハードコード）
-- `"バグ","不具合","デグレ"` → `extracted_skills += ["問題解決"]`
-- `"顧客","提案","商談"` → `extracted_skills += ["顧客折衝"]`
-- `"設計","レビュー"` → `extracted_skills += ["設計力"]`
-- スタンスタグ例: `"振り返り","学び"` → `extracted_stance += ["自省"]`
-- `gained_points`/`delta_today`は固定値（例:+2pt）で加算し、同一セッション内のみ有効。
+解析ルール（モック）
+- つぶやき文から感情タグ（ポジティブ/ネガティブ/タスク）を判定。
+- タスク抽出はパターンマッチで実施（20種類以上を想定）。
 
 visibility仕様
 - 許容値: `"private"` または `"public"`。
@@ -65,17 +56,53 @@ visibility仕様
 - 許容値: `"memo"`（メモモード/蓄積のみ/AI応答なし）、`"consult"`（相談モード/AI応答あり）。
 - ローカルモックでは `"consult"` 選択時に固定のスタブ応答テキスト `ai_reply` を表示するだけで、外部APIは呼ばない。
 
-スタイル指針（style.css）
-- CSS変数で`--bg`,`--fg`,`--accent`など基本色と`--radius`,`--shadow`を定義。
-- 共通ユーティリティ: 余白ユーティリティ（必要最小限）、`.card`、フレックス/グリッド簡易クラス。
-- フォントはシステムUIで統一し、外部CDNフォントは使わない。
+スタイル指針
+- RPG風の視覚表現を含めた「成長が見える」UIを重視。
+- ホームは情報密度高め、焚火広場は温かみのある配色を採用。
 
 プロンプトテンプレ（VSCode拡張向け）
 - 「外部CDNなし」「type='module'を使わない」「プレーンCSS/JSのみ」「sectionごとに`data-section`属性を付与」「アクセシビリティを考慮しheading階層を正しく」など制約を冒頭に記載。
 
-動作フロー
-1) `npm run dev`でサーバ起動 → 初期`fetch` → stateセット → 各セクションをrender
-2) 投稿フォームでつぶやき入力 → ルール抽出 → state更新 → render
+動作フロー（ホーム）
+1) つぶやき投稿
+2) 感情分析・タスク抽出
+3) タスクボード更新
+4) 日報草案の更新
+
+API設計（バックエンド）
+- 認証: `Authorization: Bearer <SHARED_TOKEN>` を必須（ローカルモックは省略可）。
+- 共通: `Content-Type: application/json`、レスポンスはJSON。
+
+1) つぶやき
+- `GET /tweets`
+  - 概要: つぶやき一覧取得（最新順）。
+  - 200: `[{"id":"tweet-...","text":"...","emotion":"positive","tasks":["..."],"created_at":1730000000}]`
+- `POST /tweets`
+  - 概要: つぶやき投稿。感情分析/タスク抽出はサーバ側で実施。
+  - body: `{ "text":"...", "visibility":"private" }`
+  - 201: `{ "id":"tweet-...","text":"...","emotion":"task","tasks":["..."],"created_at":1730000000 }`
+
+2) 日報
+- `POST /reports`
+  - 概要: 指定日のつぶやき/タスクから日報草案を生成。
+  - body: `{ "date":"YYYY-MM-DD" }`
+  - 200: `{ "date":"YYYY-MM-DD","summary":"...","tasks_by_category":[...],"insights":["..."] }`
+
+3) 汎用AI実行（Bedrockゲートウェイ）
+- `POST /ai/execute`
+  - 概要: フロントが組み立てたBedrockペイロードをそのまま代理実行。
+  - body: `{ "model_id":"...", "payload":{...} }`
+  - 200: `{ "model_id":"...","response":{...},"request_id":"..." }`
+
+4) タスク（将来拡張）
+- `GET /tasks`
+  - 概要: タスクボードの一覧取得。
+- `PATCH /tasks/{task_id}`
+  - 概要: ステータス更新（待機中/実施中/完了）。
+
+5) エール（将来拡張）
+- `POST /cheers`
+  - 概要: 匿名エール送信（カウント更新）。
 
 インフラ/スタブ方針
 - 本番想定: フロントは S3 + CloudFront（静的配信）、API は API Gateway + Lambda、データは DynamoDB、LLMは Bedrock を想定。
@@ -99,6 +126,7 @@ Bedrock汎用Lambda（ゲートウェイ）方針
   - response: `{ "text": "...", "model_id": "...", "usage": { "input_tokens": 0, "output_tokens": 0 } }`
 - 既存APIとの整合:
   - 日報生成は暫定で専用エンドポイント（`POST /reports`）を持ち、将来的に汎用Lambdaへ統合する。
+  - 現行の汎用LambdaはモデルIDを固定しており、`model_id` 指定は無視する。
 
 認証方針（Cognito）
 - フロー: Authorization Code + PKCE を採用（Implicit/ROPCは非採用）。Cognito標準ドメインを使用し、クライアントはパブリックのみ。

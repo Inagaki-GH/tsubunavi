@@ -4,7 +4,7 @@ const { BedrockRuntime } = require("aws-sdk");
 
 const bedrock = new BedrockRuntime({ region: process.env.AWS_REGION || "us-east-1" });
 const SHARED_TOKEN = process.env.SHARED_TOKEN;
-const DEFAULT_MODEL_ID = process.env.BEDROCK_MODEL_ID;
+const DEFAULT_MODEL_ID = "anthropic.claude-3-5-sonnet-20240620-v1:0";
 
 exports.handler = async (event) => {
   try {
@@ -28,10 +28,7 @@ exports.handler = async (event) => {
       if (!body) {
         return json(400, { message: "request body is required" });
       }
-      const modelId = body.model_id || DEFAULT_MODEL_ID;
-      if (!modelId) {
-        return json(400, { message: "model_id is required" });
-      }
+      const modelId = DEFAULT_MODEL_ID;
       const payload = body.payload ?? body.input ?? null;
       if (!payload) {
         return json(400, { message: "payload is required" });

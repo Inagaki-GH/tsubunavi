@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI機能テスト - つぶナビ</title>
+    <style>
+        body { font-family: 'Zen Maru Gothic', sans-serif; padding: 20px; background: #FFF8E1; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { background: white; padding: 20px; margin: 20px 0; border-radius: 15px; box-shadow: 0 4px 12px rgba(255, 152, 0, 0.1); }
+        .test-title { color: #FF9800; font-size: 18px; font-weight: bold; margin-bottom: 15px; }
+        .test-input { width: 100%; padding: 10px; border: 2px solid #FFE0B2; border-radius: 10px; margin-bottom: 10px; }
+        .test-button { background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%); color: white; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .test-result { background: #FFFBF5; padding: 15px; border-radius: 10px; margin-top: 10px; border: 2px solid #FFE0B2; white-space: pre-wrap; }
+        .status { padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; margin-bottom: 10px; }
+        .status.success { background: #E8F5E9; color: #2E7D32; }
+        .status.fallback { background: #FFF3E0; color: #F57C00; }
+        .status.error { background: #FFEBEE; color: #C62828; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="color: #FF9800; text-align: center;">🤖 AI機能テスト</h1>
+        
+        <div class="test-section">
+            <div class="test-title">1. つぶやき分析テスト</div>
+            <input type="text" class="test-input" id="tweetInput" placeholder="例: 今日はAPI設計書を作成する予定です。楽しみ！" value="今日はAPI設計書を作成する予定です。楽しみ！">
+            <button class="test-button" onclick="testTweetAnalysis()">分析実行</button>
+            <div id="tweetResult"></div>
+        </div>
+        
+        <div class="test-section">
+            <div class="test-title">2. 日報生成テスト</div>
+            <textarea class="test-input" id="reportInput" rows="4" placeholder="つぶやき履歴を入力...">チーム会議で新機能について話し合った
+API設計書を作成した
+コードレビューを実施した
+明日のタスクを整理した</textarea>
+            <button class="test-button" onclick="testReportGeneration()">日報生成</button>
+            <div id="reportResult"></div>
+        </div>
+        
+        <div class="test-section">
+            <div class="test-title">3. 苦悩分析テスト</div>
+            <input type="text" class="test-input" id="struggleInput" placeholder="例: 最近成長している実感がなくて不安です" value="最近成長している実感がなくて不安です">
+            <button class="test-button" onclick="testStruggleAnalysis()">苦悩分析</button>
+            <div id="struggleResult"></div>
+        </div>
+        
+        <div class="test-section">
+            <div class="test-title">4. あしあと生成テスト</div>
+            <button class="test-button" onclick="testFootprintGeneration()">あしあと生成</button>
+            <div id="footprintResult"></div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <a href="home_tsubunavi.html" style="background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%); color: white; padding: 15px 30px; border-radius: 25px; text-decoration: none; font-weight: bold;">🏠 メインアプリに戻る</a>
+        </div>
+    </div>
+
+    <script>
+        // つぶやき分析テスト
+        async function testTweetAnalysis() {
+            const input = document.getElementById('tweetInput').value;
+            const resultDiv = document.getElementById('tweetResult');
+            
+            resultDiv.innerHTML = '<div class="status">🔄 AI分析中...</div>';
+            
+            try {
+                const result = await analyzeTweetDirect(input);
+                const statusClass = result.source === 'ai' ? 'success' : 'fallback';
+                const statusText = result.source === 'ai' ? '✅ AI分析成功' : '⚠️ フォールバック処理';
+                
+                resultDiv.innerHTML = `
+                    <div class="status ${statusClass}">${statusText}</div>
+                    <div class="test-result">${JSON.stringify(result.data, null, 2)}</div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="status error">❌ エラー発生</div>
+                    <div class="test-result">エラー: ${error.message}</div>
+                `;
+            }
+        }
+        
+        // 日報生成テスト
+        async function testReportGeneration() {
+            const input = document.getElementById('reportInput').value;
+            const resultDiv = document.getElementById('reportResult');
+            
+            resultDiv.innerHTML = '<div class="status">🔄 日報生成中...</div>';
+            
+            try {
+                const result = await generateReportDirect(input);
+                const statusClass = result.source === 'ai' ? 'success' : 'fallback';
+                const statusText = result.source === 'ai' ? '✅ AI生成成功' : '⚠️ フォールバック処理';
+                
+                resultDiv.innerHTML = `
+                    <div class="status ${statusClass}">${statusText}</div>
+                    <div class="test-result">${result.data}</div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="status error">❌ エラー発生</div>
+                    <div class="test-result">エラー: ${error.message}</div>
+                `;
+            }
+        }
+        
+        // 苦悩分析テスト
+        async function testStruggleAnalysis() {
+            const input = document.getElementById('struggleInput').value;
+            const resultDiv = document.getElementById('struggleResult');
+            
+            resultDiv.innerHTML = '<div class="status">🔄 苦悩分析中...</div>';
+            
+            try {
+                const result = await analyzeStruggleDirect(input);
+                const statusClass = result.source === 'ai' ? 'success' : 'fallback';
+                const statusText = result.source === 'ai' ? '✅ AI分析成功' : '⚠️ フォールバック処理';
+                
+                resultDiv.innerHTML = `
+                    <div class="status ${statusClass}">${statusText}</div>
+                    <div class="test-result">${JSON.stringify(result.data, null, 2)}</div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="status error">❌ エラー発生</div>
+                    <div class="test-result">エラー: ${error.message}</div>
+                `;
+            }
+        }
+        
+        // あしあと生成テスト
+        async function testFootprintGeneration() {
+            const resultDiv = document.getElementById('footprintResult');
+            
+            resultDiv.innerHTML = '<div class="status">🔄 あしあと生成中...</div>';
+            
+            try {
+                const result = await generateFootprintDirect();
+                const statusClass = result.source === 'ai' ? 'success' : 'fallback';
+                const statusText = result.source === 'ai' ? '✅ AI生成成功' : '⚠️ フォールバック処理';
+                
+                resultDiv.innerHTML = `
+                    <div class="status ${statusClass}">${statusText}</div>
+                    <div class="test-result">${JSON.stringify(result.data, null, 2)}</div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="status error">❌ エラー発生</div>
+                    <div class="test-result">エラー: ${error.message}</div>
+                `;
+            }
+        }
+        
+        // AI呼び出し関数群
+        async function analyzeTweetDirect(text) {
+            // フォールバック処理
+            const isTask = /作る|作成|対応|準備|実施|やる|する|しないと|まで/.test(text);
+            const isPositive = /嬉しい|楽しい|良い|成功|できた|頑張|ありがと/.test(text);
+            const isNegative = /難しい|困|大変|疲|辛|できない|わからない/.test(text);
+            
+            return {
+                source: 'fallback',
+                data: {
+                    isTask,
+                    isPositive,
+                    isNegative,
+                    extractedTask: isTask ? text.substring(0, 20) + '...' : null,
+                    skill: isTask ? 'プログラミング' : null
+                }
+            };
+        }
+        
+        async function generateReportDirect(tweets) {
+            // フォールバック処理
+            const lines = tweets.split('\n').filter(line => line.trim());
+            const report = `【本日の活動報告】\n\n` +
+                lines.map((line, i) => `${i + 1}. ${line}`).join('\n') +
+                `\n\n【所感】\n本日は${lines.length}件の活動を行いました。`;
+            
+            return { source: 'fallback', data: report };
+        }
+        
+        async function analyzeStruggleDirect(text) {
+            // フォールバック処理
+            const categories = {
+                '技術': /技術|プログラム|コード|バグ|エラー|開発/,
+                'キャリア': /成長|キャリア|将来|転職|昇進|評価/,
+                '人間関係': /人間関係|チーム|上司|同僚|コミュニケーション/,
+                'その他': /.*/
+            };
+            
+            let category = 'その他';
+            for (const [cat, regex] of Object.entries(categories)) {
+                if (regex.test(text)) {
+                    category = cat;
+                    break;
+                }
+            }
+            
+            const severity = text.length > 30 ? '高' : text.length > 15 ? '中' : '低';
+            const suggestions = {
+                '技術': '技術書を読んだり、実際にコードを書いて練習することをお勧めします。',
+                'キャリア': '目標を明確にして、小さなステップから始めてみましょう。',
+                '人間関係': '相手の立場を理解し、積極的にコミュニケーションを取ってみましょう。',
+                'その他': '一人で抱え込まず、信頼できる人に相談してみることをお勧めします。'
+            };
+            
+            return {
+                source: 'fallback',
+                data: {
+                    category,
+                    severity,
+                    suggestion: suggestions[category]
+                }
+            };
+        }
+        
+        async function generateFootprintDirect() {
+            // あしあとダミーデータ
+            const dummyFootprints = {
+                currentStatus: {
+                    activeSkills: [
+                        { skill: "JavaScript", level: 75, recentActivity: "リアクトコンポーネント作成" },
+                        { skill: "API設計", level: 60, recentActivity: "REST API仕様書作成" },
+                        { skill: "チーム連携", level: 80, recentActivity: "コードレビュー実施" }
+                    ],
+                    todaysTasks: [
+                        { task: "API設計書作成", skill: "API設計", completed: false, priority: "high" },
+                        { task: "チーム会議参加", skill: "チーム連携", completed: true, priority: "medium" }
+                    ],
+                    emotionalState: {
+                        positive: 70,
+                        negative: 20,
+                        neutral: 10,
+                        dominantEmotion: "前向き"
+                    }
+                },
+                recentFootprints: [
+                    {
+                        date: "2024-01-15",
+                        skillGrowth: [
+                            { skill: "React", growth: "+5", reason: "新しいHookを学習" },
+                            { skill: "デバッグ", growth: "+3", reason: "バグ修正で経験積" }
+                        ],
+                        completedTasks: 3,
+                        mood: "充実"
+                    },
+                    {
+                        date: "2024-01-14",
+                        skillGrowth: [
+                            { skill: "SQL", growth: "+4", reason: "複雑なクエリ作成" },
+                            { skill: "ドキュメント作成", growth: "+2", reason: "仕様書更新" }
+                        ],
+                        completedTasks: 2,
+                        mood: "集中"
+                    }
+                ],
+                insights: {
+                    growingSkills: ["JavaScript", "API設計"],
+                    stagnantSkills: ["テスト設計"],
+                    recommendedFocus: "フロントエンド技術の深化",
+                    nextMilestone: "シニアエンジニアへのステップアップ"
+                }
+            };
+            
+            return { source: 'fallback', data: dummyFootprints };
+        }
+    </script>
+</body>
+</html>

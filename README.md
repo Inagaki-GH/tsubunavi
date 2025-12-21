@@ -67,8 +67,10 @@ npm run dev:tweet
 6. 反映後、`AWS_SESSION_TOKEN` の有効期限が切れたら再取得してください。
 
 ## Bedrockモデル設定
-- 日報生成Lambdaのモデルは変数で切り替え可能。デフォルトは `anthropic.claude-3-haiku-20240307-v1:0`（オンデマンド対応モデル）。  
+- 日報生成Lambdaのモデルは変数で切り替え可能（`bedrock_model_id`）。  
+- 汎用AI実行Lambda（`/ai/execute`）は `anthropic.claude-3-5-sonnet-20240620-v1:0` に固定（model_id指定は無視）。
 - `backend/variables.tf` の `bedrock_model_id` を変更するか、`terraform apply -var 'bedrock_model_id=...'` で上書きしてください。
+- `docs/model.log` によると、オンデマンド利用可能な最新のAnthropicモデルは `anthropic.claude-3-5-sonnet-20240620-v1:0`。
 
 ## API呼び出し（ローカル開発）
 - PoCではCognitoを使わず、共有Bearerトークンで保護しています（API Gateway + Lambda内で検証）。

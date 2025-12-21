@@ -47,5 +47,5 @@ API仕様（汎用）
 
 バックエンド利用のポイント
 - `ai_execute.js` は `payload` をそのまま Bedrock に転送する汎用ゲートウェイ。
-- `model_id` 未指定時は環境変数 `BEDROCK_MODEL_ID` を使用。
+- `model_id` は現状無視され、Lambda側で `anthropic.claude-3-5-sonnet-20240620-v1:0` に固定。
 - 認証は `SHARED_TOKEN`（Bearer）を利用。

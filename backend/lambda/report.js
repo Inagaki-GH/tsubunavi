@@ -114,13 +114,13 @@ async function fetchMemosByDate(date) {
   const res = await dynamo
     .scan({
       TableName: TABLE,
-      FilterExpression: "#d = :d",
-      ExpressionAttributeNames: { "#d": "created_date" },
-      ExpressionAttributeValues: { ":d": date },
       Limit: 200,
     })
     .promise();
-  const items = res.Items || [];
+  const items = (res.Items || []).filter((item) => {
+    if (item.timestamp) return String(item.timestamp).slice(0, 10) === date;
+    return false;
+  });
   const texts = items.map((i) => `- ${i.text || ""}`).join("\n");
   return texts;
 }

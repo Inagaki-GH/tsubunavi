@@ -6,8 +6,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="${ROOT_DIR}/frontend"
-BUCKET="${1:-}"
-DIST_ID="${2:-}"
+BUCKET=tsubunavi-frontend-unique-bucket
+DIST_ID="${1:-}"
 
 if [[ -z "${BUCKET}" ]]; then
   echo "Usage: $0 <s3-bucket-name> [cloudfront-distribution-id]" >&2

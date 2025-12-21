@@ -3,6 +3,8 @@
   const API_TOKEN = window.API_CONFIG?.token || null;
   const API_MODE = (window.API_CONFIG?.mode || "local").toLowerCase();
   const USE_API = API_MODE === "api" && API_BASE && API_TOKEN;
+  const STORAGE_USER_KEY = "tsubunavi_user_id";
+  const DEFAULT_USER_ID = "user_12345";
 
   const state = {
     tweets: [],
@@ -113,11 +115,11 @@
       };
       postTweetToApi(payload).then((created) => {
         if (created) {
-          // merge created_at/id from API with local analysis fields
+          // merge timestamp/id from API with local analysis fields
           const merged = {
             ...newTweet,
             id: created.id || newTweet.id,
-            created_at: created.created_at,
+            timestamp: created.timestamp,
           };
           state.tweets.push(merged);
           textarea.value = "";
@@ -153,7 +155,8 @@
 
   async function fetchTweetsFromApi() {
     try {
-      const res = await fetch(`${API_BASE}/tweets`, {
+      const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
+      const res = await fetch(`${API_BASE}/tweets?userId=${encodeURIComponent(userId)}`, {
         headers: {
           Authorization: `Bearer ${API_TOKEN}`,
         },
@@ -171,13 +174,14 @@
 
   async function postTweetToApi(payload) {
     try {
+      const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
       const res = await fetch(`${API_BASE}/tweets`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${API_TOKEN}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, userId }),
       });
       if (!res.ok) throw new Error(`post tweet failed: ${res.status}`);
       const created = await res.json();
@@ -201,7 +205,7 @@
       id: t.id,
       text: t.text || "",
       visibility: t.visibility || "private",
-      created_at: t.created_at,
+      timestamp: t.timestamp,
       extracted_skills: t.extracted_skills || [],
       extracted_stance: t.extracted_stance || [],
       gained_points: t.gained_points || 0,

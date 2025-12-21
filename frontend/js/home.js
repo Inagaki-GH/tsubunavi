@@ -1,13 +1,15 @@
 (() => {
         'use strict';
 
+        const STORAGE_USER_KEY = "tsubunavi_user_id";
+        const DEFAULT_USER_ID = "user_12345";
         let skillLevel = 25;
         let taskIdCounter = 4;
         const tweets = [];
-        const AI_ENDPOINT = (window.API_CONFIG?.baseUrl || '').replace(/\/$/, '');
-        const AI_TOKEN = window.API_CONFIG?.token || '';
+        const API_ENDPOINT = (window.API_CONFIG?.baseUrl || '').replace(/\/$/, '');
+        const API_TOKEN = window.API_CONFIG?.token || '';
         const AI_MODEL_ID = window.API_CONFIG?.modelId || 'anthropic.claude-3-haiku-20240307-v1:0';
-        const USE_AI = (window.API_CONFIG?.mode || 'local').toLowerCase() === 'api' && AI_ENDPOINT && AI_TOKEN;
+        const USE_API = (window.API_CONFIG?.mode || 'local').toLowerCase() === 'api' && API_ENDPOINT && API_TOKEN;
         
         // エールメッセージを読み込んで表示
         function loadCheerMessages() {
@@ -34,17 +36,60 @@
         }
         
         // ページ読み込み時に実行
+        const userNameEl = document.getElementById('userName');
+        if (userNameEl) {
+            const storedId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
+            userNameEl.textContent = storedId;
+        }
         loadCheerMessages();
         loadViewRequests();
         loadPublicFootprints();
+        loadTweetsFromApi();
+        loadTasksFromApi();
+
+        async function loadTweetsFromApi() {
+            if (!USE_API) return;
+            try {
+                const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
+                const res = await fetch(`${API_ENDPOINT}/api/tweets?userId=${encodeURIComponent(userId)}`, {
+                    headers: { 'Authorization': `Bearer ${API_TOKEN}` },
+                    method: 'GET'
+                });
+                if (!res.ok) throw new Error(`tweets api failed: ${res.status}`);
+                const data = await res.json();
+                const filtered = (Array.isArray(data) ? data : []).filter((t) => (t.userId || DEFAULT_USER_ID) === userId);
+                const normalized = filtered.map(normalizeApiTweet);
+                tweets.length = 0;
+                normalized.forEach(t => tweets.push(t));
+                renderTweetHistory();
+            } catch (e) {
+                console.warn('load tweets error', e);
+            }
+        }
+
+        async function loadTasksFromApi() {
+            if (!USE_API) return;
+            try {
+                const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
+                const res = await fetch(`${API_ENDPOINT}/api/tasks?userId=${encodeURIComponent(userId)}`, {
+                    headers: { 'Authorization': `Bearer ${API_TOKEN}` }
+                });
+                if (!res.ok) throw new Error(`tasks api failed: ${res.status}`);
+                const data = await res.json();
+                const filtered = (Array.isArray(data) ? data : []).filter((t) => (t.userId || DEFAULT_USER_ID) === userId);
+                renderTaskBoard(filtered);
+            } catch (e) {
+                console.warn('load tasks error', e);
+            }
+        }
         
         function analyzeTweet(text) {
-            if (USE_AI) {
-                return fetch(`${AI_ENDPOINT}/ai/execute`, {
+            if (USE_API) {
+                return fetch(`${API_ENDPOINT}/ai/execute`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${AI_TOKEN}`
+                        'Authorization': `Bearer ${API_TOKEN}`
                     },
                     body: JSON.stringify({
                         model_id: AI_MODEL_ID,
@@ -68,7 +113,9 @@
                 .then(data => {
                     try {
                         const raw = data?.response?.content?.[0]?.text || '';
-                        return JSON.parse(raw);
+                        const parsed = safeJsonFromText(raw);
+                        if (!parsed) throw new Error('no json');
+                        return parsed;
                     } catch (e) {
                         console.error('JSONパースエラー:', e);
                         return fallbackAnalysis(text);
@@ -97,7 +144,8 @@
             
             const analysis = await analyzeTweet(text);
             const now = new Date();
-            tweets.unshift({ text, time: now, ...analysis });
+            const timestamp = now.toISOString();
+            tweets.unshift({ text, time: now, timestamp, ...analysis });
             input.value = '';
             
             renderTweetHistory();
@@ -106,6 +154,19 @@
                 addTaskFromTweet(text, analysis);
             }
             
+            if (USE_API) {
+                const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
+                fetch(`${API_ENDPOINT}/api/tweets`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_TOKEN}`
+                    },
+                    body: JSON.stringify({ text, userId })
+                }).then(() => loadTasksFromApi())
+                  .catch(err => console.error('tweet api error', err));
+            }
+
             // 苦悩分析（バックグラウンド）
             if (analysis.isNegative) {
                 analyzeTweetForStruggle('user_current', text);
@@ -169,6 +230,21 @@
             
             localStorage.setItem('footprints', JSON.stringify(footprints));
         }
+
+        function safeJsonFromText(text) {
+            if (!text) return null;
+            try {
+                return JSON.parse(text);
+            } catch (_e) {
+                const match = text.match(/\{[\s\S]*\}/);
+                if (!match) return null;
+                try {
+                    return JSON.parse(match[0]);
+                } catch (_e2) {
+                    return null;
+                }
+            }
+        }
         
         function addTaskFromTweet(text, analysis) {
             const taskId = `task${taskIdCounter++}`;
@@ -187,6 +263,41 @@
                 <div class="skill-tags"><span class="skill-tag">${analysis.skill || '業務タスク'}</span></div>
             `;
             document.querySelector('[data-column="pending"]').appendChild(taskCard);
+        }
+
+        function renderTaskBoard(items) {
+            const columns = {
+                pending: document.querySelector('[data-column="pending"]'),
+                inprogress: document.querySelector('[data-column="inprogress"]'),
+                done: document.querySelector('[data-column="done"]')
+            };
+            Object.values(columns).forEach(col => {
+                if (!col) return;
+                const existing = Array.from(col.querySelectorAll('.task-card'));
+                existing.forEach(card => card.remove());
+            });
+
+            items.forEach((task) => {
+                const status = (task.status || 'pending').toLowerCase();
+                const target = columns[status] || columns.pending;
+                if (!target) return;
+
+                const taskCard = document.createElement('div');
+                taskCard.className = 'task-card';
+                taskCard.draggable = true;
+                taskCard.id = task.id || task.taskId || `task_${Date.now()}`;
+                taskCard.dataset.taskId = task.id || task.taskId || '';
+                taskCard.dataset.skill = task.skill || '業務タスク';
+                taskCard.ondragstart = drag;
+
+                const title = task.title || task.extractedTask || '';
+                const skill = task.skill || '業務タスク';
+                taskCard.innerHTML = `
+                    <div class="task-title">${title}</div>
+                    <div class="skill-tags"><span class="skill-tag">${skill}</span></div>
+                `;
+                target.appendChild(taskCard);
+            });
         }
         
         function extractTaskTitle(text) {
@@ -229,8 +340,14 @@
         function renderTweetHistory() {
             const container = document.getElementById('tweetHistory');
             container.innerHTML = '';
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const todaysTweets = tweets.filter((tweet) => {
+                if (tweet.timestamp) return String(tweet.timestamp).slice(0, 10) === todayStr;
+                if (tweet.time) return isSameDay(tweet.time, new Date());
+                return false;
+            });
             
-            tweets.forEach(tweet => {
+            todaysTweets.forEach(tweet => {
                 const item = document.createElement('div');
                 item.className = 'tweet-item';
                 const timeStr = `${tweet.time.getHours()}:${String(tweet.time.getMinutes()).padStart(2, '0')}`;
@@ -250,8 +367,20 @@
                 container.appendChild(item);
             });
         }
+
+        function isSameDay(a, b) {
+            const da = a instanceof Date ? a : new Date(a);
+            const db = b instanceof Date ? b : new Date(b);
+            if (Number.isNaN(da.getTime()) || Number.isNaN(db.getTime())) return false;
+            return da.getFullYear() === db.getFullYear() &&
+                da.getMonth() === db.getMonth() &&
+                da.getDate() === db.getDate();
+        }
         
         function generateReport() {
+            if (USE_API) {
+                return generateReportFromApi();
+            }
             const today = new Date();
             const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
             
@@ -299,6 +428,43 @@ ${insights}`;
             document.getElementById('reportContent').textContent = report;
             document.getElementById('reportCard').style.display = 'block';
             document.getElementById('reportCard').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function generateReportFromApi() {
+            const date = new Date().toISOString().slice(0, 10);
+            try {
+                const res = await fetch(`${API_ENDPOINT}/reports`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_TOKEN}`
+                    },
+                    body: JSON.stringify({ date })
+                });
+                if (!res.ok) throw new Error(`report api failed: ${res.status}`);
+                const data = await res.json();
+                const report = data?.report || '';
+                document.getElementById('reportContent').textContent = report;
+                document.getElementById('reportCard').style.display = 'block';
+                document.getElementById('reportCard').scrollIntoView({ behavior: 'smooth' });
+            } catch (e) {
+                console.error('report api error', e);
+                const msg = '日報生成に失敗しました';
+                document.getElementById('reportContent').textContent = msg;
+                document.getElementById('reportCard').style.display = 'block';
+            }
+        }
+
+        function normalizeApiTweet(item) {
+            const time = item?.timestamp ? new Date(item.timestamp) : new Date();
+            return {
+                text: item?.text || '',
+                time,
+                timestamp: item?.timestamp || null,
+                isTask: Boolean(item?.isTask),
+                isPositive: Boolean(item?.isPositive),
+                isNegative: Boolean(item?.isNegative)
+            };
         }
         
         function summarizeTasks(taskTweets) {
@@ -382,6 +548,14 @@ ${insights}`;
             
             if (column) {
                 column.appendChild(task);
+                const status = column.dataset.column || 'pending';
+                const taskId = task?.dataset?.taskId || task?.id || '';
+                if (USE_API && taskId) {
+                    updateTaskStatus(taskId, status).catch((err) => {
+                        console.warn('task status update failed', err);
+                        loadTasksFromApi();
+                    });
+                }
                 
                 if (column.dataset.column === 'done') {
                     const skill = task.dataset.skill;
@@ -426,6 +600,23 @@ ${insights}`;
         
         function getCurrentUserId() {
             return 'user_current';
+        }
+
+        async function updateTaskStatus(taskId, status) {
+            if (!USE_API) return;
+            const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
+            const res = await fetch(`${API_ENDPOINT}/api/tasks/${encodeURIComponent(taskId)}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API_TOKEN}`
+                },
+                body: JSON.stringify({ status, userId })
+            });
+            if (!res.ok) {
+                throw new Error(`task update failed: ${res.status}`);
+            }
+            return res.json();
         }
         
         // 閲覧依頼を読み込み

@@ -35,6 +35,11 @@ data "aws_iam_policy_document" "lambda_policy" {
   }
 
   statement {
+    actions   = ["bedrock:InvokeModel"]
+    resources = ["*"]
+  }
+
+  statement {
     actions = [
       "dynamodb:PutItem",
       "dynamodb:GetItem",
@@ -42,7 +47,10 @@ data "aws_iam_policy_document" "lambda_policy" {
       "dynamodb:UpdateItem",
       "dynamodb:DeleteItem",
     ]
-    resources = [aws_dynamodb_table.tweets.arn]
+    resources = [
+      aws_dynamodb_table.tweets.arn,
+      aws_dynamodb_table.tasks.arn
+    ]
   }
 }
 
@@ -148,8 +156,10 @@ resource "aws_lambda_function" "tweets" {
 
   environment {
     variables = {
-      TABLE_NAME   = aws_dynamodb_table.tweets.name
-      SHARED_TOKEN = var.shared_token
+      TABLE_NAME      = aws_dynamodb_table.tweets.name
+      TASK_TABLE_NAME = aws_dynamodb_table.tasks.name
+      SHARED_TOKEN    = var.shared_token
+      BEDROCK_MODEL_ID = var.bedrock_model_id
     }
   }
 
@@ -213,7 +223,7 @@ resource "aws_apigatewayv2_api" "http" {
   cors_configuration {
     allow_credentials = false
     allow_headers     = ["Content-Type", "Authorization"]
-    allow_methods     = ["GET", "POST", "OPTIONS"]
+    allow_methods     = ["GET", "POST", "PATCH", "OPTIONS"]
     allow_origins     = compact([var.frontend_local_url, var.frontend_prod_url])
   }
 }
@@ -305,6 +315,24 @@ resource "aws_apigatewayv2_route" "post_api_tweets" {
 resource "aws_apigatewayv2_route" "get_api_tweets" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "GET /api/tweets"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "get_api_tasks" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /api/tasks"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "patch_api_tasks_id" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "PATCH /api/tasks/{id}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "options_api_tasks_id" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "OPTIONS /api/tasks/{id}"
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 

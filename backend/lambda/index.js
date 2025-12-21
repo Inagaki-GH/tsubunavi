@@ -1,10 +1,14 @@
 "use strict";
 
-const { DynamoDB } = require("aws-sdk");
+const { DynamoDB, BedrockRuntime } = require("aws-sdk");
 
 const client = new DynamoDB.DocumentClient();
+const bedrock = new BedrockRuntime({ region: process.env.AWS_REGION || "us-east-1" });
 const TABLE = process.env.TABLE_NAME;
+const TASK_TABLE = process.env.TASK_TABLE_NAME;
 const SHARED_TOKEN = process.env.SHARED_TOKEN;
+const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID || "anthropic.claude-3-5-sonnet-20240620-v1:0";
+const DEFAULT_USER_ID = "user_12345";
 
 exports.handler = async (event) => {
   try {
@@ -18,7 +22,7 @@ exports.handler = async (event) => {
         statusCode: 204,
         headers: {
           "Access-Control-Allow-Origin": event.headers?.origin || "*",
-          "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+          "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type,Authorization",
         },
       };
@@ -33,18 +37,112 @@ exports.handler = async (event) => {
       if (!body || !body.text) {
         return json(400, { message: "text is required" });
       }
-      const analysis = analyzeTweet(body.text);
-      return json(201, {
-        tweetId: `tweet_${Date.now()}`,
-        userId: body.userId || null,
+      const analysis = await analyzeTweet(body.text);
+      const now = Date.now();
+      const tweetId = `tweet_${now}`;
+      const timestamp = new Date(now).toISOString();
+      const userId = (body.userId || body.user_id || "").trim() || DEFAULT_USER_ID;
+      const tweetItem = {
+        id: tweetId,
+        tweetId,
+        userId,
         text: body.text,
-        timestamp: new Date().toISOString(),
+        timestamp,
         ...analysis,
-      });
+      };
+
+      await client
+        .put({
+          TableName: TABLE,
+          Item: tweetItem,
+        })
+        .promise();
+
+      if (analysis.isTask && TASK_TABLE) {
+        const taskItem = {
+          id: `task_${now}`,
+          taskId: `task_${now}`,
+          tweetId,
+          userId,
+          title: analysis.extractedTask || body.text,
+          skill: analysis.skill || null,
+          status: "pending",
+          timestamp,
+        };
+        await client
+          .put({
+            TableName: TASK_TABLE,
+            Item: taskItem,
+          })
+          .promise();
+      }
+
+      return json(201, tweetItem);
     }
 
     if (route === "/api/tweets" && method === "GET") {
-      return json(200, []);
+      const userId = event.queryStringParameters?.userId || DEFAULT_USER_ID;
+      const res = await client
+        .scan({
+          TableName: TABLE,
+          Limit: 50,
+        })
+        .promise();
+      const items = (res.Items || []).filter((item) => item.userId === userId).sort((a, b) => {
+        const ta = Date.parse(a.timestamp || "") || 0;
+        const tb = Date.parse(b.timestamp || "") || 0;
+        return tb - ta;
+      });
+      return json(200, items);
+    }
+
+    if (route === "/api/tasks" && method === "GET") {
+      const userId = event.queryStringParameters?.userId || DEFAULT_USER_ID;
+      if (!TASK_TABLE) return json(200, []);
+      const res = await client
+        .scan({
+          TableName: TASK_TABLE,
+          Limit: 100,
+        })
+        .promise();
+      const items = (res.Items || []).filter((item) => item.userId === userId).sort((a, b) => {
+        const ta = Date.parse(a.timestamp || "") || 0;
+        const tb = Date.parse(b.timestamp || "") || 0;
+        return tb - ta;
+      });
+      return json(200, items);
+    }
+
+    if (route.startsWith("/api/tasks/") && method === "PATCH") {
+      if (!TASK_TABLE) return json(404, { message: "Task table not configured" });
+      const taskId = route.split("/")[3];
+      if (!taskId) return json(400, { message: "taskId is required" });
+      const body = parseBody(event.body, event.isBase64Encoded) || {};
+      const status = String(body.status || "").trim();
+      if (!status) return json(400, { message: "status is required" });
+      const now = new Date().toISOString();
+      try {
+        const res = await client
+          .update({
+            TableName: TASK_TABLE,
+            Key: { id: taskId },
+            UpdateExpression: "SET #status = :status, updated_at = :updated_at",
+            ExpressionAttributeNames: { "#status": "status" },
+            ExpressionAttributeValues: {
+              ":status": status,
+              ":updated_at": now,
+            },
+            ConditionExpression: "attribute_exists(id)",
+            ReturnValues: "ALL_NEW",
+          })
+          .promise();
+        return json(200, res.Attributes || {});
+      } catch (err) {
+        if (err.code === "ConditionalCheckFailedException") {
+          return json(404, { message: "Task not found" });
+        }
+        throw err;
+      }
     }
 
     if (route === "/api/villages" && method === "GET") {
@@ -117,13 +215,18 @@ exports.handler = async (event) => {
     }
 
     if (route === "/tweets" && method === "GET") {
+      const userId = event.queryStringParameters?.userId || DEFAULT_USER_ID;
       const res = await client
         .scan({
           TableName: TABLE,
           Limit: 50,
         })
         .promise();
-      const items = (res.Items || []).sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      const items = (res.Items || []).filter((item) => item.userId === userId).sort((a, b) => {
+        const ta = Date.parse(a.timestamp || "") || 0;
+        const tb = Date.parse(b.timestamp || "") || 0;
+        return tb - ta;
+      });
       return json(200, items);
     }
 
@@ -135,13 +238,15 @@ exports.handler = async (event) => {
         return json(400, { message: "text is required" });
       }
       const now = Date.now();
+      const timestamp = new Date(now).toISOString();
+      const userId = (body.userId || body.user_id || "").trim() || DEFAULT_USER_ID;
       const item = {
         id: `tweet-${now}`,
         text: body.text,
         visibility: body.visibility || "private",
         mode: body.mode || "memo",
-        created_at: now,
-        created_date: new Date(now).toISOString().slice(0, 10), // YYYY-MM-DD
+        userId,
+        timestamp,
       };
       console.log("put item", item);
       const putRes = await client
@@ -162,33 +267,83 @@ exports.handler = async (event) => {
   }
 };
 
-function analyzeTweet(text) {
-  const isTask = /作る|作成|対応|準備|実施|やる|する|しないと|まで/.test(text);
-  const isPositive = /嬉しい|楽しい|良い|成功|できた|頑張|ありがと/.test(text);
-  const isNegative = /難しい|困|大変|疲|辛|できない|わからない/.test(text);
-  const extractedTask = isTask ? normalizeTask(text) : null;
+async function analyzeTweet(text) {
+  const prompt = `以下のつぶやきを分析してJSONのみで回答してください。
+
+つぶやき: "${text}"
+
+出力JSONフォーマット:
+{
+  "isTask": true/false,
+  "isPositive": true/false,
+  "isNegative": true/false,
+  "extractedTask": "タスク名（タスクがある場合のみ）",
+  "skill": "関連スキル名（タスクがある場合のみ）"
+}
+
+項目説明:
+- isTask: 業務タスクとして具体的に実行可能な内容が含まれる場合は true。それ以外は false。
+- isPositive: ポジティブな感情や達成感が含まれる場合は true。
+- isNegative: ネガティブな感情や不安・困難が含まれる場合は true。
+- extractedTask: タスクがある場合のみ、短く具体的な名詞句に整形したタスク名。タスクが無い場合は空文字または null。
+- skill: タスクに関連するスキル名を1つだけ記載。タスクが無い場合は空文字または null。
+必ずJSONのみで回答し、前後の説明文は付けないでください。`;
+
+  const payload = {
+    anthropic_version: "bedrock-2023-05-31",
+    max_tokens: 512,
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  };
+
+  const res = await bedrock
+    .invokeModel({
+      modelId: BEDROCK_MODEL_ID,
+      contentType: "application/json",
+      accept: "application/json",
+      body: JSON.stringify(payload),
+    })
+    .promise();
+
+  const raw = decodeBody(res.body);
+  const parsed = safeJsonParse(raw);
+  const textOut = parsed?.content?.[0]?.text || "";
+  const result = extractJson(textOut);
   return {
-    isTask,
-    isPositive,
-    isNegative,
-    extractedTask,
-    skill: isTask ? "課題解決" : null,
+    isTask: Boolean(result?.isTask),
+    isPositive: Boolean(result?.isPositive),
+    isNegative: Boolean(result?.isNegative),
+    extractedTask: result?.extractedTask || null,
+    skill: result?.skill || null,
   };
 }
 
-function normalizeTask(text) {
-  const patterns = [
-    { regex: /(.+?)を作成する/, format: (m) => `${m[1]}の作成` },
-    { regex: /(.+?)を作る/, format: (m) => `${m[1]}の作成` },
-    { regex: /(.+?)の準備をしないと/, format: (m) => `${m[1]}の準備` },
-    { regex: /(.+?)を準備/, format: (m) => `${m[1]}の準備` },
-    { regex: /(.+?)を調査/, format: (m) => `${m[1]}の調査` },
-  ];
-  for (const p of patterns) {
-    const m = text.match(p.regex);
-    if (m) return p.format(m);
+function decodeBody(body) {
+  if (!body) return "";
+  if (Buffer.isBuffer(body)) return body.toString("utf-8");
+  if (typeof body === "string") return body;
+  if (body instanceof Uint8Array) return Buffer.from(body).toString("utf-8");
+  return String(body);
+}
+
+function safeJsonParse(text) {
+  try {
+    return JSON.parse(text);
+  } catch (_e) {
+    return null;
   }
-  return text;
+}
+
+function extractJson(text) {
+  const direct = safeJsonParse(text);
+  if (direct) return direct;
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return {};
+  return safeJsonParse(match[0]) || {};
 }
 
 function parseBody(body, isBase64Encoded) {
@@ -211,7 +366,7 @@ function json(statusCode, body) {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type,Authorization",
     },
     body: JSON.stringify(body),

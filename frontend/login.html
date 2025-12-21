@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン - つぶナビ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Zen Maru Gothic', sans-serif; background: linear-gradient(135deg, #FFF8E1 0%, #FFE0B2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: #FFF; border-radius: 30px; padding: 40px; box-shadow: 0 8px 24px rgba(255, 152, 0, 0.15); width: 100%; max-width: 420px; }
+    .title { font-size: 24px; font-weight: bold; color: #FF9800; margin-bottom: 20px; text-align: center; }
+    .label { font-size: 14px; color: #5D4037; margin-bottom: 8px; display: block; }
+    .input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 2px solid #FFE0B2; font-size: 16px; margin-bottom: 16px; font-family: 'Zen Maru Gothic', sans-serif; }
+    .btn { width: 100%; padding: 12px 20px; border-radius: 20px; border: none; background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%); color: #FFF; font-weight: bold; font-size: 16px; cursor: pointer; }
+    .note { margin-top: 12px; font-size: 12px; color: #8d6e63; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="title">つぶナビ / ダミーログイン</div>
+    <label class="label" for="login-username">ユーザーID</label>
+    <input id="login-username" class="input" type="text" placeholder="例: user_12345" maxlength="40">
+    <button id="login-submit" class="btn" type="button">ログイン</button>
+    <div class="note">入力したユーザー名はローカルに保存されます</div>
+  </div>
+  <script src="login.js"></script>
+</body>
+</html>

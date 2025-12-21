@@ -254,6 +254,60 @@ resource "aws_apigatewayv2_route" "post_tweets" {
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
+resource "aws_apigatewayv2_route" "get_api_users_dashboard" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /api/users/{userId}/dashboard"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "get_api_users_footprints" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /api/users/{userId}/footprints"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "get_api_activities_footprints" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /api/activities/footprints/{userId}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "get_api_villages" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /api/villages"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "get_api_mentors_recommend" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /api/mentors/recommend/{userId}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "post_api_activities" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /api/activities"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "post_api_support" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /api/support"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "post_api_tweets" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /api/tweets"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "get_api_tweets" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /api/tweets"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
 resource "aws_apigatewayv2_route" "post_reports" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "POST /reports"
@@ -278,6 +332,14 @@ resource "aws_lambda_permission" "apigw" {
   function_name = aws_lambda_function.tweets.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*/tweets"
+}
+
+resource "aws_lambda_permission" "apigw_api" {
+  statement_id  = "AllowAPIGatewayInvokeApi"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.tweets.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*/api/*"
 }
 
 resource "aws_lambda_permission" "apigw_report" {

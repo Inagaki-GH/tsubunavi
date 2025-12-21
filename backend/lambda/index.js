@@ -28,6 +28,94 @@ exports.handler = async (event) => {
       return json(401, { message: "Unauthorized" });
     }
 
+    if (route === "/api/tweets" && method === "POST") {
+      const body = parseBody(event.body, event.isBase64Encoded);
+      if (!body || !body.text) {
+        return json(400, { message: "text is required" });
+      }
+      const analysis = analyzeTweet(body.text);
+      return json(201, {
+        tweetId: `tweet_${Date.now()}`,
+        userId: body.userId || null,
+        text: body.text,
+        timestamp: new Date().toISOString(),
+        ...analysis,
+      });
+    }
+
+    if (route === "/api/tweets" && method === "GET") {
+      return json(200, []);
+    }
+
+    if (route === "/api/villages" && method === "GET") {
+      return json(200, []);
+    }
+
+    if (route === "/api/activities" && method === "POST") {
+      const body = parseBody(event.body, event.isBase64Encoded) || {};
+      return json(200, {
+        status: "ok",
+        activityId: `activity_${Date.now()}`,
+        received: body,
+      });
+    }
+
+    if (route === "/api/support" && method === "POST") {
+      const body = parseBody(event.body, event.isBase64Encoded) || {};
+      return json(200, {
+        status: "ok",
+        userId: body.userId || null,
+        count: 1,
+      });
+    }
+
+    if (route.startsWith("/api/users/") && route.endsWith("/dashboard") && method === "GET") {
+      const userId = route.split("/")[3];
+      return json(200, {
+        user: { userId },
+        tasks: {
+          pending: [],
+          inprogress: [],
+          done: [],
+        },
+        recentTweets: [],
+        cheer: { count: 0 },
+      });
+    }
+
+    if (route.startsWith("/api/activities/footprints/") && method === "GET") {
+      const userId = route.split("/")[4];
+      return json(200, {
+        userId,
+        currentStatus: {
+          activeSkills: [],
+          todaysTasks: [],
+          emotionalState: {
+            positive: 70,
+            negative: 20,
+            neutral: 10,
+            dominantEmotion: "前向き",
+          },
+        },
+        footprints: [],
+        insights: {
+          growingSkills: [],
+          stagnantSkills: [],
+          recommendedFocus: "",
+          nextMilestone: "",
+        },
+      });
+    }
+
+    if (route.startsWith("/api/users/") && route.endsWith("/footprints") && method === "GET") {
+      const userId = route.split("/")[3];
+      return json(200, { userId, footprints: [] });
+    }
+
+    if (route.startsWith("/api/mentors/recommend/") && method === "GET") {
+      return json(200, []);
+    }
+
     if (route === "/tweets" && method === "GET") {
       const res = await client
         .scan({
@@ -73,6 +161,35 @@ exports.handler = async (event) => {
     return json(500, { message: "Internal Server Error" });
   }
 };
+
+function analyzeTweet(text) {
+  const isTask = /作る|作成|対応|準備|実施|やる|する|しないと|まで/.test(text);
+  const isPositive = /嬉しい|楽しい|良い|成功|できた|頑張|ありがと/.test(text);
+  const isNegative = /難しい|困|大変|疲|辛|できない|わからない/.test(text);
+  const extractedTask = isTask ? normalizeTask(text) : null;
+  return {
+    isTask,
+    isPositive,
+    isNegative,
+    extractedTask,
+    skill: isTask ? "課題解決" : null,
+  };
+}
+
+function normalizeTask(text) {
+  const patterns = [
+    { regex: /(.+?)を作成する/, format: (m) => `${m[1]}の作成` },
+    { regex: /(.+?)を作る/, format: (m) => `${m[1]}の作成` },
+    { regex: /(.+?)の準備をしないと/, format: (m) => `${m[1]}の準備` },
+    { regex: /(.+?)を準備/, format: (m) => `${m[1]}の準備` },
+    { regex: /(.+?)を調査/, format: (m) => `${m[1]}の調査` },
+  ];
+  for (const p of patterns) {
+    const m = text.match(p.regex);
+    if (m) return p.format(m);
+  }
+  return text;
+}
 
 function parseBody(body, isBase64Encoded) {
   if (body == null) return null;

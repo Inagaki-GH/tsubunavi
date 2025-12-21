@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>あしあとと里 - つぶナビ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Zen Maru Gothic', sans-serif; background: #87CEEB; overflow: hidden; }
+        header { background: #FFF; padding: 15px 30px; box-shadow: 0 4px 12px rgba(255, 152, 0, 0.15); display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 100; }
+        .logo { font-size: 24px; font-weight: bold; color: #FF9800; }
+        nav { display: flex; gap: 15px; }
+        .nav-btn { padding: 10px 20px; border-radius: 30px; text-decoration: none; color: #666; background: #FFF; transition: all 0.3s; }
+        .nav-btn.active { background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%); color: white; box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3); }
+        #canvas { display: block; width: 100%; height: calc(100vh - 80px); }
+        .info-panel { position: fixed; top: 100px; right: 20px; background: rgba(255, 255, 255, 0.95); border-radius: 25px; padding: 20px; width: 320px; max-height: 70vh; overflow-y: auto; box-shadow: 0 8px 24px rgba(255, 152, 0, 0.2); display: none; }
+        .panel-title { font-size: 20px; font-weight: bold; color: #FF9800; margin-bottom: 15px; }
+        .ranking-item { background: #FFF3E0; border-radius: 15px; padding: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .rank { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; }
+        .pin-btn { background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%); color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; font-family: 'Zen Maru Gothic', sans-serif; }
+        .pin-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(255, 152, 0, 0.4); }
+        .legend { position: fixed; top: 100px; left: 20px; background: rgba(255, 255, 255, 0.95); border-radius: 25px; padding: 20px; box-shadow: 0 8px 24px rgba(255, 152, 0, 0.2); }
+        .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 14px; color: #5D4037; }
+        .controls { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, 0.95); border-radius: 25px; padding: 15px 30px; box-shadow: 0 8px 24px rgba(255, 152, 0, 0.2); }
+        .control-text { color: #5D4037; font-size: 14px; text-align: center; }
+        @keyframes shimmer { 0%, 100% { filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.6)); } 50% { filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.9)); } }
+        @keyframes sparkle { 0%, 100% { opacity: 1; transform: scale(1) rotate(0deg); } 50% { opacity: 0.6; transform: scale(1.3) rotate(180deg); } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">💬 つぶナビ</div>
+        <nav>
+            <a href="home_tsubunavi.html" class="nav-btn">🏠 ホーム</a>
+            <a href="forest_tsubunavi.html" class="nav-btn active">🌲 あしあとと里</a>
+            <a href="bonfire_premium.html" class="nav-btn">🔥 夜の焚火広場</a>
+        </nav>
+        <div style="font-weight: bold; color: #5D4037;">田中 健太</div>
+    </header>
+    
+    <canvas id="canvas"></canvas>
+    
+    <div class="info-panel" id="infoPanel">
+        <div class="panel-title" id="panelTitle">💬 コミュニケーションの里</div>
+        <div style="margin-bottom: 15px; color: #666; font-size: 14px;" id="panelStatus"></div>
+        <div style="font-weight: bold; margin-bottom: 10px; color: #5D4037;">🏆 ポイントランキング TOP5</div>
+        <div id="rankingList"></div>
+        <button class="pin-btn" onclick="pinVillage()">📍 この里を目標に設定</button>
+    </div>
+    
+    <div class="legend">
+        <div style="font-weight: bold; margin-bottom: 15px; color: #FF9800;">凡例</div>
+        <div class="legend-item"><span style="font-size: 20px;">🧑</span> あなた</div>
+        <div class="legend-item"><span style="font-size: 20px;">👤</span> 公開されたあしあと</div>
+        <div class="legend-item"><span style="font-size: 20px;">👣</span> あしあと</div>
+        <div class="legend-item"><div style="width: 20px; height: 20px; border-radius: 50%; background: #FFB74D;"></div> 開拓済み</div>
+        <div class="legend-item"><div style="width: 20px; height: 20px; border-radius: 50%; background: #999;"></div> 未開拓</div>
+        <div class="legend-item"><span style="font-size: 20px;">🔥</span> 最大人数</div>
+    </div>
+    
+    <div class="controls">
+        <div class="control-text">🖱️ クリック: 里を選択 | ESC: パネルを閉じる</div>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight - 80;
+        
+        const villages = [
+            { x: canvas.width * 0.5, y: canvas.height * 0.15, icon: '💬', name: 'コミュニケーション', color: '#FFB74D', size: 90, unlocked: true, members: 45, requiredLevel: 0 },
+            { x: canvas.width * 0.8, y: canvas.height * 0.3, icon: '🧩', name: '課題解決', color: '#FF9800', size: 85, unlocked: false, members: 32, requiredLevel: 8 },
+            { x: canvas.width * 0.85, y: canvas.height * 0.65, icon: '🏗️', name: 'システム設計', color: '#FFA726', size: 80, unlocked: false, members: 28, requiredLevel: 10 },
+            { x: canvas.width * 0.2, y: canvas.height * 0.3, icon: '👑', name: 'リーダーシップ', color: '#FFB74D', size: 75, unlocked: false, members: 18, requiredLevel: 12 },
+            { x: canvas.width * 0.15, y: canvas.height * 0.65, icon: '💡', name: '提案力', color: '#FF9800', size: 85, unlocked: true, members: 38, requiredLevel: 0 }
+        ];
+        
+        const rankings = {
+            'コミュニケーション': [
+                { name: '山田 太郎', points: 850 },
+                { name: '佐藤 美咲', points: 720 },
+                { name: '鈴木 一郎', points: 680 },
+                { name: '田中 花子', points: 650 },
+                { name: '伊藤 健', points: 620 }
+            ],
+            '課題解決': [
+                { name: '高橋 明', points: 920 },
+                { name: '渡辺 美紀', points: 880 },
+                { name: '中村 大輔', points: 840 },
+                { name: '小林 真由', points: 800 },
+                { name: '加藤 誠', points: 760 }
+            ]
+        };
+        
+        const maxVillage = villages.reduce((max, v) => v.members > max.members ? v : max);
+        let selectedVillage = null;
+        
+        const footprints = [];
+        
+        // localStorageからあしあとを読み込み
+        function loadFootprints() {
+            const saved = JSON.parse(localStorage.getItem('footprints') || '[]');
+            footprints.length = 0;
+            saved.forEach(fp => {
+                fp.userId = 'user_12345';
+                fp.userName = '田中 健太';
+                footprints.push(fp);
+            });
+            
+            // 公開された他人のあしあと
+            const approvals = JSON.parse(localStorage.getItem('footprintApprovals') || '{}');
+            const approvedUsers = Object.keys(approvals).filter(key => approvals[key].approved);
+            
+            if (approvedUsers.length > 0) {
+                const sharedFootprints = [
+                    {"userId": "user_67890", "userName": "山田 太郎", "date": "2023-01-15", "activity": "成長実感がなくて不安だった", "skill": "メンタルケア", "emotion": "😰", "isNegative": true, "phase": "苦悩期"},
+                    {"userId": "user_67890", "userName": "山田 太郎", "date": "2023-03-20", "activity": "小さな目標を設定してみた", "skill": "目標設定", "emotion": "💪", "isPositive": true, "phase": "模索期"},
+                    {"userId": "user_67890", "userName": "山田 太郎", "date": "2023-06-10", "activity": "達成感が可視化されて前向きになれた", "skill": "モチベーション", "emotion": "🌟", "isPositive": true, "phase": "成長期"},
+                    {"userId": "user_67890", "userName": "山田 太郎", "date": "2023-09-01", "activity": "定期的な振り返りで成長を実感できるようになった", "skill": "自己管理", "emotion": "🎉", "isPositive": true, "phase": "克服期"}
+                ];
+                sharedFootprints.forEach(fp => footprints.push(fp));
+            }
+        }
+        
+        loadFootprints();
+        
+        const trees = [
+            { x: canvas.width * 0.1, y: canvas.height * 0.15 },
+            { x: canvas.width * 0.15, y: canvas.height * 0.3 },
+            { x: canvas.width * 0.12, y: canvas.height * 0.55 },
+            { x: canvas.width * 0.9, y: canvas.height * 0.2 },
+            { x: canvas.width * 0.85, y: canvas.height * 0.4 },
+            { x: canvas.width * 0.92, y: canvas.height * 0.8 },
+            { x: canvas.width * 0.5, y: canvas.height * 0.1 },
+            { x: canvas.width * 0.35, y: canvas.height * 0.85 },
+            { x: canvas.width * 0.65, y: canvas.height * 0.15 }
+        ];
+        
+        function drawGround() {
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#8BC34A');
+            gradient.addColorStop(0.5, '#7CB342');
+            gradient.addColorStop(1, '#689F38');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = 'rgba(139, 195, 74, 0.3)';
+            for (let i = 0; i < 200; i++) {
+                ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 2, 2);
+            }
+        }
+        
+        function drawFootprints() {
+            // 中心（プレイヤー）の位置
+            const centerX = canvas.width * 0.5;
+            const centerY = canvas.height * 0.5;
+            
+            // スキルごとにあしあとをグループ化
+            const footprintsBySkill = {};
+            footprints.forEach(fp => {
+                if (!footprintsBySkill[fp.skill]) {
+                    footprintsBySkill[fp.skill] = [];
+                }
+                footprintsBySkill[fp.skill].push(fp);
+            });
+            
+            // 各里に向かうあしあとを描画
+            villages.forEach(village => {
+                const skillFootprints = footprintsBySkill[village.name] || [];
+                
+                skillFootprints.forEach((fp, index) => {
+                    // 中心から里に向かうパスを計算
+                    const progress = (index + 1) / (skillFootprints.length + 1);
+                    const x = centerX + (village.x - centerX) * progress;
+                    const y = centerY + (village.y - centerY) * progress;
+                    
+                    // 感情による色変化
+                    let color = '#FFB74D';
+                    if (fp.isPositive) color = '#81C784';
+                    if (fp.isNegative) color = '#EF5350';
+                    
+                    // 光る円
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 18, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // 足跡絵文字
+                    ctx.font = '22px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(fp.emotion, x, y);
+                    
+                    // クリック可能なエリアを保存
+                    fp.x = x;
+                    fp.y = y;
+                });
+            });
+        }
+        
+        let time = 0;
+        
+        function drawVillages() {
+            time++;
+            villages.forEach(village => {
+                if (village.unlocked) {
+                    // 開拓済みの里
+                    const gradient = ctx.createRadialGradient(village.x, village.y, 0, village.x, village.y, village.size);
+                    gradient.addColorStop(0, village.color + 'CC');
+                    gradient.addColorStop(0.7, village.color + '66');
+                    gradient.addColorStop(1, 'transparent');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(village.x, village.y, village.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = village.color;
+                    ctx.beginPath();
+                    ctx.arc(village.x, village.y, village.size * 0.7, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.font = `${village.size * 0.5}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(village.icon, village.x, village.y);
+                    
+                    ctx.font = `bold ${village.size * 0.2}px "Zen Maru Gothic"`;
+                    ctx.fillStyle = '#5D4037';
+                    ctx.fillText(village.name, village.x, village.y + village.size * 0.8);
+                    ctx.fillText('の里', village.x, village.y + village.size * 1.1);
+                } else {
+                    // 未開拓の里（わくわくデザイン）
+                    // 虹色の光の輪
+                    for (let i = 0; i < 3; i++) {
+                        const radius = village.size + 20 + i * 15 + Math.sin(time * 0.03 + i) * 10;
+                        const hue = (time + i * 60) % 360;
+                        ctx.strokeStyle = `hsla(${hue}, 80%, 60%, ${0.4 - i * 0.1})`;
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.arc(village.x, village.y, radius, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                    
+                    // キラキラ星
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (Math.PI * 2 / 6) * i + time * 0.02;
+                        const dist = village.size + 25 + Math.sin(time * 0.04 + i) * 10;
+                        const sx = village.x + Math.cos(angle) * dist;
+                        const sy = village.y + Math.sin(angle) * dist;
+                        const sparkleSize = 15 + Math.sin(time * 0.05 + i) * 5;
+                        ctx.save();
+                        ctx.translate(sx, sy);
+                        ctx.rotate(time * 0.03 + i);
+                        ctx.font = `${sparkleSize}px Arial`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.shadowColor = '#FFD700';
+                        ctx.shadowBlur = 15;
+                        ctx.fillText('✨', 0, 0);
+                        ctx.restore();
+                    }
+                    
+                    // グレーのベース
+                    const gradient = ctx.createRadialGradient(village.x, village.y, 0, village.x, village.y, village.size);
+                    gradient.addColorStop(0, '#BDBDBD');
+                    gradient.addColorStop(0.7, '#9E9E9E66');
+                    gradient.addColorStop(1, 'transparent');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(village.x, village.y, village.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#999';
+                    ctx.shadowColor = '#FFD700';
+                    ctx.shadowBlur = 20 + Math.sin(time * 0.05) * 10;
+                    ctx.beginPath();
+                    ctx.arc(village.x, village.y, village.size * 0.7, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    
+                    // 点線の枠
+                    ctx.strokeStyle = '#FFD700';
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([10, 10]);
+                    ctx.lineDashOffset = -time * 0.5;
+                    ctx.beginPath();
+                    ctx.arc(village.x, village.y, village.size * 0.7, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    // 疑問符（バウンス）
+                    const bounce = Math.sin(time * 0.04) * 8;
+                    ctx.save();
+                    ctx.translate(village.x, village.y + bounce);
+                    ctx.rotate(Math.sin(time * 0.03) * 0.1);
+                    ctx.font = `${village.size * 0.6}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = '#FFD700';
+                    ctx.shadowBlur = 25;
+                    ctx.fillText('❓', 0, 0);
+                    ctx.restore();
+                    ctx.shadowBlur = 0;
+                    
+                    // 名前
+                    ctx.font = `bold ${village.size * 0.2}px "Zen Maru Gothic"`;
+                    ctx.fillStyle = '#999';
+                    ctx.fillText('???', village.x, village.y + village.size * 0.8);
+                    ctx.fillText('の里', village.x, village.y + village.size * 1.1);
+                    
+                    // 必要レベル
+                    ctx.font = `bold ${village.size * 0.18}px "Zen Maru Gothic"`;
+                    ctx.fillStyle = '#FFD700';
+                    ctx.shadowColor = '#FFD700';
+                    ctx.shadowBlur = 10;
+                    ctx.fillText(`🔒 Lv.${village.requiredLevel}で開放`, village.x, village.y + village.size * 1.4);
+                    ctx.shadowBlur = 0;
+                }
+                
+                if (village === maxVillage && village.unlocked) {
+                    ctx.font = `${village.size * 0.4}px Arial`;
+                    ctx.fillText('🔥', village.x + village.size * 0.6, village.y - village.size * 0.6);
+                }
+            });
+        }
+        
+        function drawTrees() {
+            trees.forEach(tree => {
+                ctx.font = '40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('🌲', tree.x, tree.y);
+            });
+        }
+        
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGround();
+            drawTrees();
+            drawFootprints();
+            drawVillages();
+            drawPlayer();
+            drawClouds();
+            
+            requestAnimationFrame(render);
+        }
+        
+        function drawPlayer() {
+            const centerX = canvas.width * 0.5;
+            const centerY = canvas.height * 0.5;
+            
+            // 影
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.beginPath();
+            ctx.ellipse(centerX, centerY + 25, 20, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // プレイヤー
+            ctx.font = 'bold 50px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = 'rgba(255, 152, 0, 0.5)';
+            ctx.shadowBlur = 15;
+            ctx.fillText('🧑', centerX, centerY);
+            ctx.shadowBlur = 0;
+            
+            // 名前プレート
+            ctx.fillStyle = 'rgba(255, 152, 0, 0.9)';
+            ctx.shadowColor = 'rgba(255, 152, 0, 0.5)';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.roundRect(centerX - 50, centerY - 60, 100, 30, 15);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            ctx.font = 'bold 16px "Zen Maru Gothic"';
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.fillText('あなた', centerX, centerY - 45);
+        }
+        
+        function showVillageInfo(village) {
+            selectedVillage = village;
+            document.getElementById('panelTitle').textContent = `${village.icon} ${village.name}の里`;
+            
+            const statusDiv = document.getElementById('panelStatus');
+            if (village.unlocked) {
+                statusDiv.innerHTML = `人数: ${village.members}人<br><span style="font-weight: bold; color: #FF9800;">開拓済み</span>`;
+            } else {
+                statusDiv.innerHTML = `あと15ptで「里の者」になれます！<br><span style="font-weight: bold; color: #999;">未開拓</span>`;
+            }
+            
+            const rankingList = document.getElementById('rankingList');
+            rankingList.innerHTML = '';
+            const villageRanking = rankings[village.name] || [];
+            villageRanking.forEach((person, index) => {
+                const item = document.createElement('div');
+                item.className = 'ranking-item';
+                item.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="rank">${index + 1}</div>
+                        <div style="font-weight: bold; font-size: 14px; color: #5D4037;">${person.name}</div>
+                    </div>
+                    <div style="font-weight: bold; color: #FF9800;">${person.points}pt</div>
+                `;
+                rankingList.appendChild(item);
+            });
+            
+            document.getElementById('infoPanel').style.display = 'block';
+        }
+        
+        function pinVillage() {
+            if (selectedVillage) {
+                localStorage.setItem('pinnedVillage', JSON.stringify({
+                    name: selectedVillage.name,
+                    icon: selectedVillage.icon
+                }));
+                alert(`📍 ${selectedVillage.name}の里を目標に設定しました！\nホーム画面の「今の目標」に追加されます。`);
+            }
+        }
+        
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            
+            // 里をクリック
+            villages.forEach(village => {
+                const dist = Math.sqrt((clickX - village.x) ** 2 + (clickY - village.y) ** 2);
+                if (dist < village.size) {
+                    showVillageInfo(village);
+                }
+            });
+            
+            // あしあとをクリック
+            footprints.forEach(fp => {
+                if (fp.x && fp.y) {
+                    const dist = Math.sqrt((clickX - fp.x) ** 2 + (clickY - fp.y) ** 2);
+                    if (dist < 20) {
+                        showFootprintDetail(fp);
+                    }
+                }
+            });
+        });
+        
+        function showFootprintDetail(fp) {
+            if (fp.userId === 'user_12345') {
+                // 自分のあしあと
+                const tooltip = document.createElement('div');
+                tooltip.innerHTML = `
+                    <div style="font-weight: bold; margin-bottom: 8px;">${fp.emotion} ${fp.date}</div>
+                    <div style="margin-bottom: 8px;">${fp.text}</div>
+                    <div style="font-size: 12px; color: #FF9800;">スキル: ${fp.skill}</div>
+                `;
+                tooltip.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.98); color: #5D4037; padding: 20px 30px; border-radius: 20px; font-size: 14px; z-index: 9999; box-shadow: 0 20px 60px rgba(255, 152, 0, 0.5); border: 3px solid #FFB74D; max-width: 400px; line-height: 1.6;';
+                document.body.appendChild(tooltip);
+                setTimeout(() => tooltip.remove(), 3000);
+            } else {
+                // 他人のあしあと - 軌跡スレッドを表示
+                showJourneyThread(fp.userName, fp.userId);
+            }
+        }
+        
+        function showJourneyThread(userName, userId) {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: flex; align-items: center; justify-content: center;';
+            
+            const content = document.createElement('div');
+            content.style.cssText = 'background: white; border-radius: 30px; padding: 40px; max-width: 700px; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); position: relative;';
+            
+            // ダミーデータ - ユーザーごとの軌跡
+            const journeyDatabase = {
+                'user_67890': {
+                    challenge: '成長実感がない',
+                    steps: [
+                        {
+                            timestamp: "2023-01-15",
+                            phase: "苦悩期",
+                            content: "毎日同じような作業の繰り返しで、本当に成長しているのか分からなくなった",
+                            action: "先輩に相談してみた",
+                            insight: "同じ悩みを持つ人が多いことを知り、少し安心した"
+                        },
+                        {
+                            timestamp: "2023-02-20",
+                            phase: "模索期",
+                            content: "小さな目標を設定してみたが、達成感を感じにくかった",
+                            action: "週単位での振り返りを始めた",
+                            insight: "小さな変化でも記録することで進歩が見えるようになった"
+                        },
+                        {
+                            timestamp: "2023-04-10",
+                            phase: "成長期",
+                            content: "振り返りを続けることで、自分の変化に気づけるようになった",
+                            action: "後輩に経験をシェアした",
+                            insight: "人に教えることで自分の成長を実感できた"
+                        },
+                        {
+                            timestamp: "2023-06-01",
+                            phase: "克服期",
+                            content: "定期的な振り返りが習慣になり、成長を実感できるようになった",
+                            action: "メンターとして他の人をサポートし始めた",
+                            insight: "成長は日々の積み重ねであり、他者を助けることでさらに成長できる"
+                        }
+                    ]
+                },
+                'user_11111': {
+                    challenge: 'チームコミュニケーション',
+                    steps: [
+                        {
+                            timestamp: "2023-03-01",
+                            phase: "苦悩期",
+                            content: "チームメンバーとの意見の食い違いが多く、プロジェクトが進まない",
+                            action: "1on1ミーティングを提案した",
+                            insight: "相手の立場を理解することの重要性に気づいた"
+                        },
+                        {
+                            timestamp: "2023-04-15",
+                            phase: "模索期",
+                            content: "積極的に質問するようにしたが、まだ距離感を感じる",
+                            action: "チームビルディング活動を企画した",
+                            insight: "仕事以外の交流も大切だと学んだ"
+                        },
+                        {
+                            timestamp: "2023-06-20",
+                            phase: "成長期",
+                            content: "チームの雰囲気が良くなり、活発な議論ができるようになった",
+                            action: "ファシリテーションスキルを学んだ",
+                            insight: "良いコミュニケーションは技術として学べる"
+                        },
+                        {
+                            timestamp: "2023-08-10",
+                            phase: "克服期",
+                            content: "チームリーダーとして信頼されるようになった",
+                            action: "他のチームにもノウハウを共有した",
+                            insight: "良いコミュニケーションは組織全体に波及する"
+                        }
+                    ]
+                }
+            };
+            
+            const journeyData = journeyDatabase[userId] || journeyDatabase['user_67890'];
+            
+            content.innerHTML = `
+                <button onclick="this.parentElement.parentElement.remove()" style="position: absolute; top: 20px; right: 25px; background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">×</button>
+                <div style="font-size: 24px; font-weight: bold; color: #FF9800; margin-bottom: 25px;">🌱 ${userName}さんの成長の軌跡</div>
+                <div style="font-size: 14px; color: #666; margin-bottom: 20px;">「${journeyData.challenge}」という課題をどう乗り越えたか</div>
+                ${journeyData.steps.map(step => `
+                    <div style="background: #FFFBF5; border-radius: 20px; padding: 20px; margin-bottom: 20px; border-left: 5px solid ${getPhaseColor(step.phase)};">
+                        <div style="color: #999; font-size: 13px; margin-bottom: 5px;">📅 ${step.timestamp}</div>
+                        <div style="display: inline-block; background: ${getPhaseColor(step.phase)}; color: white; padding: 5px 15px; border-radius: 15px; font-size: 12px; font-weight: bold; margin-bottom: 10px;">${step.phase}</div>
+                        <div style="color: #5D4037; line-height: 1.6; margin-bottom: 10px;">${step.content}</div>
+                        <div style="color: #1976D2; margin: 8px 0;">💡 ${step.action}</div>
+                        <div style="color: #388E3C; margin: 8px 0;">✨ ${step.insight}</div>
+                    </div>
+                `).join('')}
+                <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 2px solid #FFE0B2; color: #FF9800; font-weight: bold;">
+                    👏 あなたもきっと乗り越えられます！
+                </div>
+            `;
+            
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+        }
+        
+        function getPhaseColor(phase) {
+            switch(phase) {
+                case '苦悩期': return '#EF5350';
+                case '模索期': return '#FFA726';
+                case '成長期': return '#66BB6A';
+                case '克服期': return '#42A5F5';
+                default: return '#FFB74D';
+            }
+        }
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('infoPanel').style.display = 'none';
+            }
+        });
+        
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight - 80;
+            render();
+        });
+        
+        render();
+    </script>
+</body>
+</html>

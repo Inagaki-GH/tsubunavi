@@ -56,6 +56,12 @@ variable "dynamodb_tasks_table_name" {
   default     = "tsubunavi-tasks"
 }
 
+variable "dynamodb_advice_table_name" {
+  description = "DynamoDB table name for daily advice"
+  type        = string
+  default     = "tsubunavi-advice"
+}
+
 variable "bedrock_model_id" {
   description = "Bedrock model ID for report generation"
   type        = string

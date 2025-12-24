@@ -49,7 +49,8 @@ data "aws_iam_policy_document" "lambda_policy" {
     ]
     resources = [
       aws_dynamodb_table.tweets.arn,
-      aws_dynamodb_table.tasks.arn
+      aws_dynamodb_table.tasks.arn,
+      aws_dynamodb_table.advice.arn
     ]
   }
 }
@@ -158,6 +159,7 @@ resource "aws_lambda_function" "tweets" {
     variables = {
       TABLE_NAME      = aws_dynamodb_table.tweets.name
       TASK_TABLE_NAME = aws_dynamodb_table.tasks.name
+      ADVICE_TABLE_NAME = aws_dynamodb_table.advice.name
       SHARED_TOKEN    = var.shared_token
       BEDROCK_MODEL_ID = var.bedrock_model_id
     }
@@ -321,6 +323,12 @@ resource "aws_apigatewayv2_route" "get_api_tweets" {
 resource "aws_apigatewayv2_route" "get_api_tasks" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "GET /api/tasks"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "get_api_advice" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /api/advice"
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 

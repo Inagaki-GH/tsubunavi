@@ -6,6 +6,7 @@ const client = new DynamoDB.DocumentClient();
 const bedrock = new BedrockRuntime({ region: process.env.AWS_REGION || "us-east-1" });
 const TABLE = process.env.TABLE_NAME;
 const TASK_TABLE = process.env.TASK_TABLE_NAME;
+const ADVICE_TABLE = process.env.ADVICE_TABLE_NAME;
 const SHARED_TOKEN = process.env.SHARED_TOKEN;
 const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID || "anthropic.claude-3-5-sonnet-20240620-v1:0";
 const DEFAULT_USER_ID = "user_12345";
@@ -40,7 +41,7 @@ exports.handler = async (event) => {
       const analysis = await analyzeTweet(body.text);
       const now = Date.now();
       const tweetId = `tweet_${now}`;
-      const timestamp = new Date(now).toISOString();
+      const timestamp = formatJstTimestamp(new Date(now));
       const userId = (body.userId || body.user_id || "").trim() || DEFAULT_USER_ID;
       const tweetItem = {
         id: tweetId,
@@ -111,6 +112,41 @@ exports.handler = async (event) => {
         return tb - ta;
       });
       return json(200, items);
+    }
+
+    if (route === "/api/advice" && method === "GET") {
+      if (!ADVICE_TABLE) return json(500, { message: "Advice table not configured" });
+      const userId = event.queryStringParameters?.userId || DEFAULT_USER_ID;
+      const date = getJstDateString(Date.now());
+      const adviceKey = `${userId}#${date}`;
+
+      const existing = await client
+        .get({
+          TableName: ADVICE_TABLE,
+          Key: { id: adviceKey },
+        })
+        .promise();
+      if (existing.Item) {
+        return json(200, existing.Item);
+      }
+
+      const memoText = await fetchRecentMemoText(userId);
+      const { advice, nextAction } = await generateAdvice(memoText);
+      const item = {
+        id: adviceKey,
+        userId,
+        date,
+        advice,
+        next_action: nextAction,
+        created_at: formatJstTimestamp(new Date()),
+      };
+      await client
+        .put({
+          TableName: ADVICE_TABLE,
+          Item: item,
+        })
+        .promise();
+      return json(200, item);
     }
 
     if (route.startsWith("/api/tasks/") && method === "PATCH") {
@@ -238,7 +274,7 @@ exports.handler = async (event) => {
         return json(400, { message: "text is required" });
       }
       const now = Date.now();
-      const timestamp = new Date(now).toISOString();
+      const timestamp = formatJstTimestamp(new Date(now));
       const userId = (body.userId || body.user_id || "").trim() || DEFAULT_USER_ID;
       const item = {
         id: `tweet-${now}`,
@@ -360,6 +396,25 @@ function parseBody(body, isBase64Encoded) {
   }
 }
 
+function formatJstTimestamp(date) {
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(date);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}+09:00`;
+}
+
+function getJstDateString(ms) {
+  const jstMs = ms + 9 * 60 * 60 * 1000;
+  return new Date(jstMs).toISOString().slice(0, 10);
+}
+
 function json(statusCode, body) {
   return {
     statusCode,
@@ -379,4 +434,77 @@ function isAuthorized(headers = {}) {
   if (!auth || !auth.toLowerCase().startsWith("bearer ")) return false;
   const token = auth.slice(7).trim();
   return token && token === SHARED_TOKEN;
+}
+
+async function fetchRecentMemoText(userId) {
+  const res = await client
+    .scan({
+      TableName: TABLE,
+      Limit: 200,
+    })
+    .promise();
+  const todayMs = Date.now();
+  const last7Dates = new Set(
+    Array.from({ length: 7 }, (_, i) => getJstDateString(todayMs - i * 24 * 60 * 60 * 1000)),
+  );
+  const items = (res.Items || []).filter((item) => {
+    if (!item || item.userId !== userId) return false;
+    const mode = (item.mode || "memo").toLowerCase();
+    if (mode !== "memo") return false;
+    if (!item.timestamp) return false;
+    const day = getJstDateString(Date.parse(item.timestamp) || 0);
+    return last7Dates.has(day);
+  });
+  const texts = items.map((i) => `- ${i.text || ""}`).join("\n");
+  return texts;
+}
+
+async function generateAdvice(memoText) {
+  if (!memoText) {
+    return {
+      advice: "最近のメモがありません。今日の目標を一つだけ書くと流れが作りやすいです。",
+      nextAction: "今日やることを1つだけメモする",
+    };
+  }
+  const prompt = `以下は直近7日間のメモです。1文のアドバイスと、次の行動を1つだけ提案してください。
+
+メモ:
+${memoText}
+
+出力JSONフォーマット:
+{
+  "advice": "1文のアドバイス",
+  "next_action": "具体的な次の行動1つ"
+}
+
+必ずJSONのみで回答してください。`;
+
+  const payload = {
+    anthropic_version: "bedrock-2023-05-31",
+    max_tokens: 300,
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  };
+
+  const res = await bedrock
+    .invokeModel({
+      modelId: BEDROCK_MODEL_ID,
+      contentType: "application/json",
+      accept: "application/json",
+      body: JSON.stringify(payload),
+    })
+    .promise();
+
+  const raw = decodeBody(res.body);
+  const parsed = safeJsonParse(raw);
+  const textOut = parsed?.content?.[0]?.text || "";
+  const result = extractJson(textOut);
+  return {
+    advice: result?.advice || "最近の動きを振り返って、優先度の高いことに集中すると良いです。",
+    nextAction: result?.next_action || "今日の最優先タスクを1つ選ぶ",
+  };
 }

@@ -22,7 +22,7 @@ exports.handler = async (event) => {
 
     if (route === "/reports" && method === "POST") {
       const body = parseBody(event.body, event.isBase64Encoded);
-      const date = (body?.date || today()).trim();
+      const date = (body?.date || todayJst()).trim();
       if (!MODEL_ID) return cors(500, { message: "MODEL_ID not configured" });
       if (!TABLE) return cors(500, { message: "TABLE_NAME not configured" });
 
@@ -125,6 +125,17 @@ async function fetchMemosByDate(date) {
   return texts;
 }
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
+function formatJstDate(date) {
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
+function todayJst() {
+  return formatJstDate(new Date());
 }

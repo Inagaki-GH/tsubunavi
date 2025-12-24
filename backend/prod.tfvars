@@ -17,6 +17,7 @@ s3_bucket_name = "tsubunavi-frontend-unique-bucket"
 # DynamoDBテーブル名（必要に応じて変更）
 dynamodb_table_name = "tsubunavi-tweets"
 dynamodb_tasks_table_name = "tsubunavi-tasks"
+dynamodb_advice_table_name = "tsubunavi-advice"
 
 # CloudFront価格クラス（コスト調整用）
 cf_price_class = "PriceClass_200"

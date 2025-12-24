@@ -46,6 +46,7 @@
         loadPublicFootprints();
         loadTweetsFromApi();
         loadTasksFromApi();
+        loadDailyAdvice();
 
         async function loadTweetsFromApi() {
             if (!USE_API) return;
@@ -80,6 +81,29 @@
                 renderTaskBoard(filtered);
             } catch (e) {
                 console.warn('load tasks error', e);
+            }
+        }
+
+        async function loadDailyAdvice() {
+            if (!USE_API) return;
+            try {
+                const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
+                const res = await fetch(`${API_ENDPOINT}/api/advice?userId=${encodeURIComponent(userId)}`, {
+                    headers: { 'Authorization': `Bearer ${API_TOKEN}` },
+                    method: 'GET'
+                });
+                if (!res.ok) throw new Error(`advice api failed: ${res.status}`);
+                const data = await res.json();
+                const advice = data?.advice || '';
+                const nextAction = data?.next_action || '';
+                const message = `
+                    <strong>おはようございます、${userId}さん！</strong><br>
+                    ${advice}${nextAction ? `<br>次の行動: ${nextAction}` : ''}
+                `;
+                const el = document.getElementById('aiMessage');
+                if (el) el.innerHTML = message;
+            } catch (e) {
+                console.warn('load advice error', e);
             }
         }
         

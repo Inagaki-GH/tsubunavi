@@ -22,6 +22,19 @@
         @keyframes bonfire-flicker { 0%, 100% { transform: scale(1) rotate(-2deg); filter: drop-shadow(0 0 30px rgba(255,152,0,0.6)); } 50% { transform: scale(1.05) rotate(2deg); filter: drop-shadow(0 0 40px rgba(255,152,0,0.8)); } }
         .scene-title { text-align: center; font-size: 42px; font-weight: bold; margin-bottom: 15px; color: #FF9800; }
         .scene-subtitle { text-align: center; font-size: 16px; color: #666; margin-bottom: 40px; line-height: 1.8; }
+        .footprint-board { background: #FFF; border-radius: 30px; padding: 40px; box-shadow: 0 8px 24px rgba(186, 104, 200, 0.15); margin-bottom: 30px; transition: all 0.3s; }
+        .footprint-board:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(186, 104, 200, 0.2); }
+        .footprint-card { background: #F3E5F5; border-radius: 25px; padding: 20px; margin-bottom: 15px; border: 2px solid #BA68C8; transition: all 0.3s; cursor: pointer; }
+        .footprint-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(186, 104, 200, 0.2); }
+        .footprint-card.expanded { border-color: #9C27B0; box-shadow: 0 8px 24px rgba(186, 104, 200, 0.3); }
+        .footprint-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .footprint-user { font-weight: bold; color: #4A148C; }
+        .footprint-date { font-size: 12px; color: #999; }
+        .footprint-summary { color: #4A148C; font-size: 14px; font-weight: 500; }
+        .footprint-content { color: #4A148C; font-size: 14px; line-height: 1.6; margin-top: 15px; display: none; }
+        .footprint-content.expanded { display: block; }
+        .expand-icon { color: #BA68C8; font-size: 18px; transition: transform 0.3s; }
+        .expand-icon.expanded { transform: rotate(180deg); }
         .sections { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
         .section { background: #FFF; border-radius: 30px; padding: 40px; box-shadow: 0 8px 24px rgba(255, 152, 0, 0.1); transition: all 0.3s; }
         .section:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(255, 152, 0, 0.15); }
@@ -66,6 +79,17 @@
             <div class="scene-subtitle">
                 静かな夜、焚火を囲んで語り合う場所。<br>
                 ここでは、誰もが温かく迎えられます。
+            </div>
+
+            <div class="footprint-board">
+                <div class="section-title">
+                    <span>👣</span>
+                    <span>成長のあしあと</span>
+                </div>
+                <div style="margin-bottom: 20px; font-size: 14px; color: #666;">
+                    他のユーザーがシェアした成長の軌跡です
+                </div>
+                <div id="sharedFootprints"></div>
             </div>
             
             <div class="sections">
@@ -216,8 +240,115 @@
         </div>
     </div>
     
+    <script src="config.js"></script>
     <script src="js/user_header.js"></script>
     <script>
+        const API_ENDPOINT = (window.API_CONFIG?.baseUrl || '').replace(/\/$/, '');
+        const API_TOKEN = window.API_CONFIG?.token || '';
+        const USE_API = (window.API_CONFIG?.mode || 'local').toLowerCase() === 'api' && API_ENDPOINT && API_TOKEN;
+
+        function buildFootprintSummaryFromContent(content) {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = content || '';
+            const text = (tmp.textContent || '').replace(/\s+/g, ' ').trim();
+            if (!text) return '🌱 成長のあしあと';
+            const short = text.length > 60 ? `${text.slice(0, 60)}...` : text;
+            return `🌱 ${short}`;
+        }
+
+        function buildTimestampLabel(raw) {
+            if (!raw) return '';
+            const date = new Date(raw);
+            if (Number.isNaN(date.getTime())) return String(raw);
+            return date.toLocaleString('ja-JP');
+        }
+
+        async function loadSharedFootprints() {
+            let sharedFootprints = [];
+            if (USE_API) {
+                try {
+                    const res = await fetch(`${API_ENDPOINT}/api/shared-footprints`, {
+                        headers: { 'Authorization': `Bearer ${API_TOKEN}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        sharedFootprints = Array.isArray(data) ? data : [];
+                    }
+                } catch (e) {
+                    console.warn('shared footprints api error', e);
+                }
+            }
+            if (!sharedFootprints.length) {
+                sharedFootprints = JSON.parse(localStorage.getItem('sharedFootprints') || '[]');
+            }
+            if (!sharedFootprints.length) {
+                sharedFootprints = [
+                    {
+                        id: 1,
+                        userName: '山田 太郎',
+                        created_at: '2024-01-15T14:30:00+09:00',
+                        summary: '🌱 バランスの取れた成長を続けています',
+                        content: `
+                            <div style="margin-bottom: 10px;">
+                                過去1週間の3件の日報を分析した結果、ポジティブとネガティブの要素がバランスよく存在し、健全な成長プロセスを歩んでいることがわかります。
+                            </div>
+                            <div style="padding: 10px; background: #E3F2FD; border-radius: 10px; border-left: 4px solid #2196F3;">
+                                <strong>🎆 総合評価:</strong> 着実な成長を続けており、今後もこのペースで継続することで、安定したスキル向上が期待できます。
+                            </div>
+                        `
+                    }
+                ];
+            }
+            renderSharedFootprints(sharedFootprints);
+        }
+
+        function renderSharedFootprints(sharedFootprints) {
+            const container = document.getElementById('sharedFootprints');
+            if (!container) return;
+            if (!sharedFootprints.length) {
+                container.innerHTML = '<div style="color:#999;">共有されたあしあとがまだありません。</div>';
+                return;
+            }
+            container.innerHTML = '';
+            sharedFootprints.forEach(footprint => {
+                const summary = footprint.summary || buildFootprintSummaryFromContent(footprint.content);
+                const timestamp = footprint.timestamp || footprint.created_at || footprint.date || '';
+                const footprintDiv = document.createElement('div');
+                footprintDiv.className = 'footprint-card';
+                footprintDiv.innerHTML = `
+                    <div class="footprint-header">
+                        <div>
+                            <div class="footprint-user">👣 ${footprint.userName || '匿名'}</div>
+                            <div class="footprint-date">${buildTimestampLabel(timestamp)}</div>
+                        </div>
+                        <div class="expand-icon">▼</div>
+                    </div>
+                    <div class="footprint-summary">${summary}</div>
+                    <div class="footprint-content">
+                        ${footprint.content || ''}
+                    </div>
+                `;
+                footprintDiv.addEventListener('click', function() {
+                    const content = this.querySelector('.footprint-content');
+                    const icon = this.querySelector('.expand-icon');
+                    if (content.classList.contains('expanded')) {
+                        content.classList.remove('expanded');
+                        icon.classList.remove('expanded');
+                        this.classList.remove('expanded');
+                    } else {
+                        content.classList.add('expanded');
+                        icon.classList.add('expanded');
+                        this.classList.add('expanded');
+                    }
+                });
+                container.appendChild(footprintDiv);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSharedFootprints();
+        });
+
         document.querySelectorAll('.support-button').forEach(button => {
             button.addEventListener('click', function() {
                 // エールをlocalStorageに保存（匿名）

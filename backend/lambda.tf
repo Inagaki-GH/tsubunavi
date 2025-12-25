@@ -51,7 +51,8 @@ data "aws_iam_policy_document" "lambda_policy" {
       aws_dynamodb_table.tweets.arn,
       aws_dynamodb_table.tasks.arn,
       aws_dynamodb_table.advice.arn,
-      aws_dynamodb_table.daily_reports.arn
+      aws_dynamodb_table.daily_reports.arn,
+      aws_dynamodb_table.shared_footprints.arn
     ]
   }
 }
@@ -162,6 +163,7 @@ resource "aws_lambda_function" "tweets" {
       TASK_TABLE_NAME = aws_dynamodb_table.tasks.name
       ADVICE_TABLE_NAME = aws_dynamodb_table.advice.name
       DAILY_REPORTS_TABLE_NAME = aws_dynamodb_table.daily_reports.name
+      SHARED_FOOTPRINTS_TABLE_NAME = aws_dynamodb_table.shared_footprints.name
       SHARED_TOKEN    = var.shared_token
       BEDROCK_MODEL_ID = var.bedrock_model_id
     }
@@ -343,6 +345,18 @@ resource "aws_apigatewayv2_route" "get_api_daily_reports" {
 resource "aws_apigatewayv2_route" "put_api_daily_report_draft" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "PUT /api/daily-report-draft"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "get_api_shared_footprints" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /api/shared-footprints"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "post_api_shared_footprints" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "POST /api/shared-footprints"
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 

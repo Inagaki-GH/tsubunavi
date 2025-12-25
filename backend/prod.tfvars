@@ -19,6 +19,7 @@ dynamodb_table_name = "tsubunavi-tweets"
 dynamodb_tasks_table_name = "tsubunavi-tasks"
 dynamodb_advice_table_name = "tsubunavi-advice"
 dynamodb_daily_reports_table_name = "tsubunavi-daily-reports"
+dynamodb_shared_footprints_table_name = "tsubunavi-shared-footprints"
 
 # CloudFront価格クラス（コスト調整用）
 cf_price_class = "PriceClass_200"

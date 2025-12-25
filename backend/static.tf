@@ -160,3 +160,20 @@ resource "aws_dynamodb_table" "daily_reports" {
     Env     = var.env
   }
 }
+
+resource "aws_dynamodb_table" "shared_footprints" {
+  name         = var.dynamodb_shared_footprints_table_name
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  tags = {
+    Project = var.project
+    Env     = var.env
+  }
+}

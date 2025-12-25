@@ -68,6 +68,12 @@ variable "dynamodb_daily_reports_table_name" {
   default     = "tsubunavi-daily-reports"
 }
 
+variable "dynamodb_shared_footprints_table_name" {
+  description = "DynamoDB table name for shared footprints"
+  type        = string
+  default     = "tsubunavi-shared-footprints"
+}
+
 variable "bedrock_model_id" {
   description = "Bedrock model ID for report generation"
   type        = string

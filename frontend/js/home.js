@@ -49,6 +49,7 @@
         loadTasksFromApi();
         loadDailyAdvice();
         loadDailyReports();
+        setReportDateDefault();
         const reportContent = document.getElementById('reportContent');
         if (reportContent) {
             reportContent.addEventListener('input', () => {
@@ -116,7 +117,10 @@
         }
 
         async function loadDailyReports() {
-            if (!USE_API) return;
+            if (!USE_API) {
+                loadSavedReportsLocal();
+                return;
+            }
             try {
                 const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
                 const res = await fetch(`${API_ENDPOINT}/api/daily-reports?userId=${encodeURIComponent(userId)}`, {
@@ -392,10 +396,11 @@
         function renderTweetHistory() {
             const container = document.getElementById('tweetHistory');
             container.innerHTML = '';
-            const todayStr = new Date().toISOString().slice(0, 10);
+            const selectedDate = getSelectedReportDate();
+            const targetDate = selectedDate || new Date().toISOString().slice(0, 10);
             const todaysTweets = tweets.filter((tweet) => {
-                if (tweet.timestamp) return String(tweet.timestamp).slice(0, 10) === todayStr;
-                if (tweet.time) return isSameDay(tweet.time, new Date());
+                if (tweet.timestamp) return String(tweet.timestamp).slice(0, 10) === targetDate;
+                if (tweet.time) return isSameDay(tweet.time, new Date(targetDate));
                 return false;
             });
 
@@ -438,8 +443,8 @@
             if (USE_API) {
                 return generateReportFromApi();
             }
-            const today = new Date();
-            const dateStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+            const selectedDate = getSelectedReportDate();
+            const dateStr = formatDateJaFromYmd(selectedDate);
             
             const schedule = [
                 '09:00-10:00 チームミーティング',
@@ -483,12 +488,13 @@ ${tasks}
 ${insights}`;
             
             document.getElementById('reportContent').value = report;
+            reportSaved = false;
             document.getElementById('reportCard').style.display = 'block';
             document.getElementById('reportCard').scrollIntoView({ behavior: 'smooth' });
         }
 
         async function generateReportFromApi() {
-            const date = new Date().toISOString().slice(0, 10);
+            const date = getSelectedReportDate();
             try {
                 const res = await fetch(`${API_ENDPOINT}/reports`, {
                     method: 'POST',
@@ -527,23 +533,25 @@ ${insights}`;
         }
 
         function renderDailyReports(items) {
-            const container = document.getElementById('reportList');
-            if (!container) return;
-            if (!items.length) {
-                container.innerHTML = '<div class="tweet-item">日報がまだありません。</div>';
-                return;
-            }
-            container.innerHTML = items.map((item) => {
-                const date = (item.date || '').replace(/-/g, '/');
-                const positive = Number(item.positive_pct || 0);
-                const negative = Number(item.negative_pct || 0);
-                const task = Number(item.task_pct || 0);
-                return `
-                    <div class="tweet-item">
-                        <div class="tweet-text">${date}のつぶやき　ポジティブ${positive}%：ネガティブ${negative}%：タスク登録${task}%</div>
-                    </div>
-                `;
-            }).join('');
+            const normalized = (items || []).map((item, index) => {
+                const date = String(item.date || '');
+                const content = String(item.report_text || '');
+                const hasContent = Boolean(content.trim());
+                const title = hasContent ? generateReportTitle(content) : '日報（下書き未保存）';
+                const stats = buildReportStatsLine(item);
+                const body = hasContent
+                    ? content
+                    : `${stats || '日報本文が未保存です。'}\n\n日報本文が未保存です。`;
+                return {
+                    id: buildReportContentId(date, index),
+                    date,
+                    title,
+                    status: hasContent ? '保存済み' : '未保存',
+                    statusClass: hasContent ? '' : 'pending',
+                    content: body
+                };
+            });
+            renderReportList(normalized);
         }
 
         
@@ -613,8 +621,13 @@ ${insights}`;
                 alert('日報の内容を入力してください。');
                 return;
             }
+            const date = getSelectedReportDate();
             try {
-                await saveReportDraft(text);
+                if (USE_API) {
+                    await saveReportDraft(text, date);
+                } else {
+                    saveReportLocal(text, date);
+                }
                 reportSaved = true;
                 alert('日報を保存しました！');
                 loadDailyReports();
@@ -651,17 +664,141 @@ ${insights}`;
             return `${y}-${m}-${day}`;
         }
 
-        async function saveReportDraft(text) {
+        function formatDateJaFromYmd(ymd) {
+            if (!ymd) return '';
+            const parts = ymd.split('-');
+            if (parts.length !== 3) return ymd;
+            const [y, m, d] = parts;
+            return `${y}年${Number(m)}月${Number(d)}日`;
+        }
+
+        function getSelectedReportDate() {
+            const input = document.getElementById('reportDate');
+            const fallback = getLocalDateYmd();
+            if (!input) return fallback;
+            return input.value || fallback;
+        }
+
+        function setReportDateDefault() {
+            const input = document.getElementById('reportDate');
+            if (!input) return;
+            if (!input.value) {
+                input.value = getLocalDateYmd();
+            }
+            input.addEventListener('change', () => {
+                reportSaved = false;
+                renderTweetHistory();
+            });
+        }
+
+        function saveReportLocal(text, date) {
+            const targetDate = date || getLocalDateYmd();
+            const title = generateReportTitle(text);
+            const savedReports = JSON.parse(localStorage.getItem('savedReports') || '{}');
+            savedReports[targetDate] = {
+                title,
+                content: text,
+                date: targetDate,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('savedReports', JSON.stringify(savedReports));
+        }
+
+        function loadSavedReportsLocal() {
+            const savedReports = JSON.parse(localStorage.getItem('savedReports') || '{}');
+            const reports = Object.values(savedReports).sort((a, b) => new Date(b.date) - new Date(a.date));
+            const normalized = reports.map((report, index) => ({
+                id: buildReportContentId(report.date, index),
+                date: report.date || '',
+                title: report.title || generateReportTitle(report.content || ''),
+                status: '保存済み',
+                statusClass: '',
+                content: report.content || ''
+            }));
+            renderReportList(normalized);
+        }
+
+        function buildReportStatsLine(item) {
+            const positive = Number(item.positive_pct || 0);
+            const negative = Number(item.negative_pct || 0);
+            const task = Number(item.task_pct || 0);
+            if (!positive && !negative && !task) return '';
+            return `ポジティブ${positive}%：ネガティブ${negative}%：タスク登録${task}%`;
+        }
+
+        function buildReportContentId(date, index) {
+            const base = String(date || `unknown-${index}`);
+            const safe = base.replace(/[^0-9a-zA-Z_-]/g, '');
+            return `content-${safe || `idx-${index}`}`;
+        }
+
+        function renderReportList(items) {
+            const container = document.getElementById('reportList');
+            if (!container) return;
+            if (!items.length) {
+                container.innerHTML = '<div class="tweet-item">日報がまだありません。</div>';
+                return;
+            }
+            container.innerHTML = items.map((item) => {
+                const displayDate = item.date ? item.date.replace(/-/g, '/') : '';
+                const statusClass = item.statusClass ? ` ${item.statusClass}` : '';
+                const body = String(item.content || '').replace(/\n/g, '<br>');
+                return `
+                    <div class="report-item">
+                        <div class="report-header" onclick="toggleReportContent('${item.id}')">
+                            <div class="report-date">${displayDate} ${item.title}</div>
+                            <div class="report-status${statusClass}">${item.status}</div>
+                        </div>
+                        <div id="${item.id}" class="report-content">
+                            ${body}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleReportContent(contentId) {
+            const contentDiv = document.getElementById(contentId);
+            if (!contentDiv) return;
+            const isHidden = contentDiv.style.display === 'none' || getComputedStyle(contentDiv).display === 'none';
+            contentDiv.style.display = isHidden ? 'block' : 'none';
+        }
+
+        function generateReportTitle(content) {
+            const titles = [
+                'システム設計スキル向上への取り組み',
+                'チームコミュニケーション強化の一日',
+                '技術学習と実装検討の成果',
+                'プロジェクト進捗と課題解決',
+                '新技術習得への挑戦',
+                'コードレビューと品質向上',
+                'API設計とアーキテクチャ検討',
+                'チーム連携と効率化の実践'
+            ];
+            if (!content) return titles[0];
+            if (content.includes('API') || content.includes('設計')) {
+                return 'API設計とシステム開発の進展';
+            }
+            if (content.includes('チーム') || content.includes('会議')) {
+                return 'チームコミュニケーション強化の一日';
+            }
+            if (content.includes('学習') || content.includes('調査')) {
+                return '技術学習と知識向上への取り組み';
+            }
+            return titles[Math.floor(Math.random() * titles.length)];
+        }
+
+        async function saveReportDraft(text, date) {
             if (!USE_API) return;
             const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
-            const date = getLocalDateYmd();
+            const targetDate = date || getLocalDateYmd();
             const res = await fetch(`${API_ENDPOINT}/api/daily-report-draft?userId=${encodeURIComponent(userId)}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${API_TOKEN}`
                 },
-                body: JSON.stringify({ date, report_text: text })
+                body: JSON.stringify({ date: targetDate, report_text: text })
             });
             if (!res.ok) throw new Error(`save report failed: ${res.status}`);
             return res.json();
@@ -701,8 +838,60 @@ ${insights}`;
             if (footprintCard) footprintCard.style.display = 'block';
         }
 
+        function buildFootprintSummary(text) {
+            const trimmed = String(text || '').replace(/\s+/g, ' ').trim();
+            if (!trimmed) return '🌱 成長のあしあと';
+            const short = trimmed.length > 60 ? `${trimmed.slice(0, 60)}...` : trimmed;
+            return `🌱 ${short}`;
+        }
+
         function shareFootprint() {
-            alert('🔥 あしあとを夜のたき火広場にシェアしました！');
+            const footprintContent = document.getElementById('footprintContent');
+            if (!footprintContent) return;
+            const contentHtml = footprintContent.innerHTML.trim();
+            const contentText = footprintContent.textContent.trim();
+            if (!contentText) {
+                alert('あしあとがまだありません。');
+                return;
+            }
+            const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
+            const userName = document.getElementById('userName')?.textContent?.trim() || userId;
+            const summary = buildFootprintSummary(contentText);
+            const timestamp = new Date().toLocaleString('ja-JP');
+
+            const sharedFootprints = JSON.parse(localStorage.getItem('sharedFootprints') || '[]');
+            sharedFootprints.unshift({
+                id: Date.now(),
+                userName,
+                summary,
+                content: contentHtml,
+                timestamp,
+                date: new Date().toISOString()
+            });
+            if (sharedFootprints.length > 10) {
+                sharedFootprints.pop();
+            }
+            localStorage.setItem('sharedFootprints', JSON.stringify(sharedFootprints));
+
+            if (USE_API) {
+                fetch(`${API_ENDPOINT}/api/shared-footprints`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_TOKEN}`
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        userName,
+                        summary,
+                        content: contentHtml
+                    })
+                }).catch((err) => {
+                    console.warn('shared footprint api error', err);
+                });
+            }
+
+            alert('🔥 あしあとを夜のたき火広場にシェアしました！\n他のユーザーが閲覧できるようになりました。');
         }
 
         function copyFootprint() {
@@ -903,5 +1092,6 @@ ${insights}`;
         window.approveRequest = approveRequest;
         window.rejectRequest = rejectRequest;
         window.stopSharing = stopSharing;
+        window.toggleReportContent = toggleReportContent;
     })();
     

@@ -8,6 +8,7 @@ const TABLE = process.env.TABLE_NAME;
 const TASK_TABLE = process.env.TASK_TABLE_NAME;
 const ADVICE_TABLE = process.env.ADVICE_TABLE_NAME;
 const DAILY_REPORTS_TABLE = process.env.DAILY_REPORTS_TABLE_NAME;
+const SHARED_FOOTPRINTS_TABLE = process.env.SHARED_FOOTPRINTS_TABLE_NAME;
 const SHARED_TOKEN = process.env.SHARED_TOKEN;
 const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID || "anthropic.claude-3-5-sonnet-20240620-v1:0";
 const DEFAULT_USER_ID = "user_12345";
@@ -196,6 +197,49 @@ exports.handler = async (event) => {
         .filter((item) => item.userId === userId)
         .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
       return json(200, items);
+    }
+
+    if (route === "/api/shared-footprints" && method === "GET") {
+      if (!SHARED_FOOTPRINTS_TABLE) {
+        return json(500, { message: "Shared footprints table not configured" });
+      }
+      const res = await client
+        .scan({
+          TableName: SHARED_FOOTPRINTS_TABLE,
+          Limit: 100,
+        })
+        .promise();
+      const items = (res.Items || []).sort((a, b) => (b.created_at_ms || 0) - (a.created_at_ms || 0));
+      return json(200, items);
+    }
+
+    if (route === "/api/shared-footprints" && method === "POST") {
+      if (!SHARED_FOOTPRINTS_TABLE) {
+        return json(500, { message: "Shared footprints table not configured" });
+      }
+      const body = parseBody(event.body, event.isBase64Encoded) || {};
+      const userId = String(body.userId || body.user_id || DEFAULT_USER_ID).trim() || DEFAULT_USER_ID;
+      const userName = String(body.userName || body.user_name || userId).trim() || userId;
+      const content = String(body.content || "").trim();
+      if (!content) return json(400, { message: "content is required" });
+      const summaryInput = String(body.summary || "").trim();
+      const now = Date.now();
+      const item = {
+        id: `footprint_${now}`,
+        userId,
+        userName,
+        summary: summaryInput || buildFootprintSummary(content),
+        content,
+        created_at: formatJstTimestamp(new Date(now)),
+        created_at_ms: now,
+      };
+      await client
+        .put({
+          TableName: SHARED_FOOTPRINTS_TABLE,
+          Item: item,
+        })
+        .promise();
+      return json(201, item);
     }
 
     if (route.startsWith("/api/tasks/") && method === "PATCH") {
@@ -487,6 +531,16 @@ function isAuthorized(headers = {}) {
   if (!auth || !auth.toLowerCase().startsWith("bearer ")) return false;
   const token = auth.slice(7).trim();
   return token && token === SHARED_TOKEN;
+}
+
+function buildFootprintSummary(content) {
+  const plain = String(content || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!plain) return "共有されたあしあと";
+  const short = plain.length > 60 ? `${plain.slice(0, 60)}...` : plain;
+  return `🌱 ${short}`;
 }
 
 async function updateDailyReport(userId, timestamp) {

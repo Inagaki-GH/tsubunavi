@@ -54,6 +54,13 @@
         .tag-task { background: #E3F2FD; color: #1976D2; border: 1px solid #90CAF9; }
         .tag-positive { background: #E8F5E9; color: #388E3C; border: 1px solid #81C784; }
         .tag-negative { background: #FFEBEE; color: #D32F2F; border: 1px solid #EF9A9A; }
+        .report-item { background: #FFFBF5; border-radius: 15px; padding: 15px; margin-bottom: 10px; border: 2px solid #FFE0B2; cursor: pointer; transition: all 0.3s; }
+        .report-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2); }
+        .report-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .report-date { font-weight: bold; color: #FF9800; }
+        .report-status { background: #E8F5E9; color: #388E3C; padding: 4px 8px; border-radius: 10px; font-size: 11px; }
+        .report-status.pending { background: #FFF3E0; color: #F57C00; }
+        .report-content { background: #FFFBF5; padding: 15px; border-radius: 15px; border: 2px solid #FFE0B2; margin-top: 10px; display: none; color: #5D4037; line-height: 1.6; }
         .cheer-message { background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); border: 3px solid #81C784; border-radius: 25px; padding: 20px; margin-bottom: 20px; animation: cheerPulse 2s ease-in-out infinite; }
         @keyframes cheerPulse { 0%, 100% { box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3); } 50% { box-shadow: 0 8px 24px rgba(76, 175, 80, 0.5); } }
         .cheer-icon { font-size: 40px; margin-bottom: 10px; animation: cheerBounce 1s ease-in-out infinite; }
@@ -173,7 +180,10 @@
         <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <div class="card-title" style="margin-bottom: 0;">📝 今日のつぶやき</div>
-                <button class="tweet-button" style="margin: 0; float: none;" onclick="generateReport()">📄 日報生成</button>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="date" id="reportDate" style="padding: 8px 12px; border-radius: 15px; border: 2px solid #FFE0B2; background: #FFFBF5; font-family: 'Zen Maru Gothic', sans-serif; color: #5D4037;">
+                    <button class="tweet-button" style="margin: 0; float: none;" onclick="generateReport()">📄 日報生成</button>
+                </div>
             </div>
             <div class="tweet-history" id="tweetHistory"></div>
         </div>

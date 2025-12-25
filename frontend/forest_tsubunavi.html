@@ -68,8 +68,22 @@
         <div class="control-text">🖱️ クリック: 里を選択 | ESC: パネルを閉じる</div>
     </div>
     
+    <script src="config.js"></script>
     <script src="js/user_header.js"></script>
     <script>
+        const STORAGE_USER_KEY = "tsubunavi_user_id";
+        const DEFAULT_USER_ID = "rui";
+        const API_ENDPOINT = (window.API_CONFIG?.baseUrl || '').replace(/\/$/, '');
+        const API_TOKEN = window.API_CONFIG?.token || '';
+        const USE_API = (window.API_CONFIG?.mode || 'local').toLowerCase() === 'api' && API_ENDPOINT && API_TOKEN;
+
+        function resolveCurrentUserId() {
+            const stored = localStorage.getItem(STORAGE_USER_KEY);
+            return (stored && stored.trim()) ? stored.trim() : DEFAULT_USER_ID;
+        }
+
+        const CURRENT_USER_ID = resolveCurrentUserId();
+
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
@@ -106,27 +120,101 @@
         const footprints = [];
         
         // localStorageからあしあとを読み込み
-        function loadFootprints() {
-            const saved = JSON.parse(localStorage.getItem('footprints') || '[]');
+        function formatFootprintDate(dateValue) {
+            const date = new Date(dateValue);
+            if (Number.isNaN(date.getTime())) return '';
+            return `${date.getMonth() + 1}/${date.getDate()}`;
+        }
+
+        function resolveSkill(text, skillHint) {
+            const raw = skillHint || '';
+            const candidates = ['コミュニケーション', '課題解決', 'システム設計', 'リーダーシップ', '提案力'];
+            const matched = candidates.find((name) => raw.includes(name));
+            if (matched) return matched;
+            const source = text || '';
+            if (source.includes('会議') || source.includes('コミュニケーション') || source.includes('相談') || source.includes('話')) {
+                return 'コミュニケーション';
+            }
+            if (source.includes('設計') || source.includes('アーキテクチャ') || source.includes('API')) {
+                return 'システム設計';
+            }
+            if (source.includes('解決') || source.includes('調査') || source.includes('問題')) {
+                return '課題解決';
+            }
+            if (source.includes('リーダー') || source.includes('チーム') || source.includes('マネジメント')) {
+                return 'リーダーシップ';
+            }
+            if (source.includes('提案') || source.includes('アイデア') || source.includes('企画')) {
+                return '提案力';
+            }
+            return '課題解決';
+        }
+
+        function resolveEmotion(item) {
+            if (item.isPositive) return '😊';
+            if (item.isNegative) return '😰';
+            return '💭';
+        }
+
+        async function loadFootprints() {
             footprints.length = 0;
-            saved.forEach(fp => {
-                fp.userId = 'user_12345';
-                fp.userName = '田中 健太';
-                footprints.push(fp);
-            });
-            
-            // 公開された他人のあしあと
-            const approvals = JSON.parse(localStorage.getItem('footprintApprovals') || '{}');
-            const approvedUsers = Object.keys(approvals).filter(key => approvals[key].approved);
-            
-            if (approvedUsers.length > 0) {
-                const sharedFootprints = [
-                    {"userId": "user_67890", "userName": "山田 太郎", "date": "2023-01-15", "activity": "成長実感がなくて不安だった", "skill": "メンタルケア", "emotion": "😰", "isNegative": true, "phase": "苦悩期"},
-                    {"userId": "user_67890", "userName": "山田 太郎", "date": "2023-03-20", "activity": "小さな目標を設定してみた", "skill": "目標設定", "emotion": "💪", "isPositive": true, "phase": "模索期"},
-                    {"userId": "user_67890", "userName": "山田 太郎", "date": "2023-06-10", "activity": "達成感が可視化されて前向きになれた", "skill": "モチベーション", "emotion": "🌟", "isPositive": true, "phase": "成長期"},
-                    {"userId": "user_67890", "userName": "山田 太郎", "date": "2023-09-01", "activity": "定期的な振り返りで成長を実感できるようになった", "skill": "自己管理", "emotion": "🎉", "isPositive": true, "phase": "克服期"}
-                ];
-                sharedFootprints.forEach(fp => footprints.push(fp));
+
+            if (USE_API) {
+                try {
+                    const tweetsRes = await fetch(`${API_ENDPOINT}/api/tweets?userId=${encodeURIComponent(CURRENT_USER_ID)}`, {
+                        headers: { 'Authorization': `Bearer ${API_TOKEN}` }
+                    });
+                    if (tweetsRes.ok) {
+                        const tweetItems = await tweetsRes.json();
+                        (Array.isArray(tweetItems) ? tweetItems : []).forEach((tweet) => {
+                            const dateLabel = formatFootprintDate(tweet.timestamp);
+                            footprints.push({
+                                text: (tweet.text || '').substring(0, 50),
+                                skill: resolveSkill(tweet.text || '', tweet.skill || ''),
+                                emotion: resolveEmotion(tweet),
+                                isPositive: Boolean(tweet.isPositive),
+                                isNegative: Boolean(tweet.isNegative),
+                                timestamp: Date.parse(tweet.timestamp || '') || Date.now(),
+                                date: dateLabel,
+                                userId: CURRENT_USER_ID,
+                                userName: document.getElementById('userName')?.textContent || CURRENT_USER_ID
+                            });
+                        });
+                    }
+
+                    const sharedRes = await fetch(`${API_ENDPOINT}/api/shared-footprints`, {
+                        headers: { 'Authorization': `Bearer ${API_TOKEN}` }
+                    });
+                    if (sharedRes.ok) {
+                        const sharedItems = await sharedRes.json();
+                        (Array.isArray(sharedItems) ? sharedItems : []).forEach((fp) => {
+                            const summaryText = fp.summary || fp.content || '';
+                            footprints.push({
+                                text: summaryText.replace(/<[^>]*>/g, '').substring(0, 50),
+                                skill: resolveSkill(summaryText, ''),
+                                emotion: '👤',
+                                isPositive: false,
+                                isNegative: false,
+                                timestamp: Number(fp.created_at_ms || Date.parse(fp.created_at || '') || Date.now()),
+                                date: formatFootprintDate(fp.created_at || fp.created_at_ms || ''),
+                                userId: fp.userId || 'shared',
+                                userName: fp.userName || '匿名'
+                            });
+                        });
+                    }
+                } catch (e) {
+                    console.warn('load footprints api error', e);
+                }
+            }
+
+            if (!USE_API || !footprints.length) {
+                const saved = JSON.parse(localStorage.getItem('footprints') || '[]');
+                saved.forEach(fp => {
+                    fp.userId = CURRENT_USER_ID;
+                    fp.userName = document.getElementById('userName')?.textContent || CURRENT_USER_ID;
+                    fp.skill = resolveSkill(fp.text || '', fp.skill || '');
+                    footprints.push(fp);
+                });
             }
         }
         
@@ -466,7 +554,7 @@
         });
         
         function showFootprintDetail(fp) {
-            if (fp.userId === 'user_12345') {
+            if (fp.userId === CURRENT_USER_ID) {
                 // 自分のあしあと
                 const tooltip = document.createElement('div');
                 tooltip.innerHTML = `

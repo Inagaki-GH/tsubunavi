@@ -3,8 +3,8 @@
 
         const STORAGE_USER_KEY = "tsubunavi_user_id";
         const DEFAULT_USER_ID = "user_12345";
-        let skillLevel = 25;
         let taskIdCounter = 4;
+        let reportSaved = false;
         const tweets = [];
         const API_ENDPOINT = (window.API_CONFIG?.baseUrl || '').replace(/\/$/, '');
         const API_TOKEN = window.API_CONFIG?.token || '';
@@ -38,8 +38,9 @@
         // ページ読み込み時に実行
         const userNameEl = document.getElementById('userName');
         if (userNameEl) {
-            const storedId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
-            userNameEl.textContent = storedId;
+            const storedId = localStorage.getItem(STORAGE_USER_KEY);
+            const displayName = (storedId && storedId.trim()) ? storedId.trim() : '田中 健太';
+            userNameEl.textContent = displayName;
         }
         loadCheerMessages();
         loadViewRequests();
@@ -47,6 +48,13 @@
         loadTweetsFromApi();
         loadTasksFromApi();
         loadDailyAdvice();
+        loadDailyReports();
+        const reportContent = document.getElementById('reportContent');
+        if (reportContent) {
+            reportContent.addEventListener('input', () => {
+                reportSaved = false;
+            });
+        }
 
         async function loadTweetsFromApi() {
             if (!USE_API) return;
@@ -106,6 +114,23 @@
                 console.warn('load advice error', e);
             }
         }
+
+        async function loadDailyReports() {
+            if (!USE_API) return;
+            try {
+                const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
+                const res = await fetch(`${API_ENDPOINT}/api/daily-reports?userId=${encodeURIComponent(userId)}`, {
+                    headers: { 'Authorization': `Bearer ${API_TOKEN}` },
+                    method: 'GET'
+                });
+                if (!res.ok) throw new Error(`daily reports api failed: ${res.status}`);
+                const data = await res.json();
+                renderDailyReports(Array.isArray(data) ? data : []);
+            } catch (e) {
+                console.warn('load daily reports error', e);
+            }
+        }
+
         
         function analyzeTweet(text) {
             if (USE_API) {
@@ -187,7 +212,10 @@
                         'Authorization': `Bearer ${API_TOKEN}`
                     },
                     body: JSON.stringify({ text, userId })
-                }).then(() => loadTasksFromApi())
+                }).then(() => {
+                    loadTasksFromApi();
+                    loadDailyReports();
+                })
                   .catch(err => console.error('tweet api error', err));
             }
 
@@ -370,6 +398,11 @@
                 if (tweet.time) return isSameDay(tweet.time, new Date());
                 return false;
             });
+
+            if (todaysTweets.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">今日のつぶやきはまだありません</div>';
+                return;
+            }
             
             todaysTweets.forEach(tweet => {
                 const item = document.createElement('div');
@@ -449,7 +482,7 @@ ${tasks}
 ■気づき
 ${insights}`;
             
-            document.getElementById('reportContent').textContent = report;
+            document.getElementById('reportContent').value = report;
             document.getElementById('reportCard').style.display = 'block';
             document.getElementById('reportCard').scrollIntoView({ behavior: 'smooth' });
         }
@@ -468,13 +501,15 @@ ${insights}`;
                 if (!res.ok) throw new Error(`report api failed: ${res.status}`);
                 const data = await res.json();
                 const report = data?.report || '';
-                document.getElementById('reportContent').textContent = report;
+                document.getElementById('reportContent').value = report;
+                reportSaved = false;
                 document.getElementById('reportCard').style.display = 'block';
                 document.getElementById('reportCard').scrollIntoView({ behavior: 'smooth' });
             } catch (e) {
                 console.error('report api error', e);
                 const msg = '日報生成に失敗しました';
-                document.getElementById('reportContent').textContent = msg;
+                document.getElementById('reportContent').value = msg;
+                reportSaved = false;
                 document.getElementById('reportCard').style.display = 'block';
             }
         }
@@ -490,6 +525,27 @@ ${insights}`;
                 isNegative: Boolean(item?.isNegative)
             };
         }
+
+        function renderDailyReports(items) {
+            const container = document.getElementById('reportList');
+            if (!container) return;
+            if (!items.length) {
+                container.innerHTML = '<div class="tweet-item">日報がまだありません。</div>';
+                return;
+            }
+            container.innerHTML = items.map((item) => {
+                const date = (item.date || '').replace(/-/g, '/');
+                const positive = Number(item.positive_pct || 0);
+                const negative = Number(item.negative_pct || 0);
+                const task = Number(item.task_pct || 0);
+                return `
+                    <div class="tweet-item">
+                        <div class="tweet-text">${date}のつぶやき　ポジティブ${positive}%：ネガティブ${negative}%：タスク登録${task}%</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
         
         function summarizeTasks(taskTweets) {
             const keywords = {
@@ -551,14 +607,109 @@ ${insights}`;
             return '・ いくつかの課題がありますが、解決に向けて進めています';
         }
         
-        function copyReport() {
-            const text = document.getElementById('reportContent').textContent;
-            navigator.clipboard.writeText(text).then(() => {
+        async function saveReport() {
+            const text = document.getElementById('reportContent').value;
+            if (!text) {
+                alert('日報の内容を入力してください。');
+                return;
+            }
+            try {
+                await saveReportDraft(text);
+                reportSaved = true;
+                alert('日報を保存しました！');
+                loadDailyReports();
+            } catch (e) {
+                console.error('save error', e);
+                alert('日報の保存に失敗しました。');
+            }
+        }
+
+        async function copyReport() {
+            const text = document.getElementById('reportContent').value;
+            if (!text) return;
+            if (USE_API && !reportSaved) {
+                alert('日報が保存されていません。まず日報を保存してください。');
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(text);
                 const msg = document.createElement('div');
                 msg.textContent = '✅ 日報をコピーしました！';
                 msg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: linear-gradient(135deg, #FFB74D 0%, #FF9800 100%); color: white; padding: 25px 50px; border-radius: 30px; font-size: 20px; font-weight: bold; z-index: 9999; box-shadow: 0 10px 30px rgba(255, 152, 0, 0.4); font-family: "Zen Maru Gothic", sans-serif;';
                 document.body.appendChild(msg);
                 setTimeout(() => msg.remove(), 2000);
+            } catch (e) {
+                console.error('copy error', e);
+            }
+        }
+
+        function getLocalDateYmd() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        async function saveReportDraft(text) {
+            if (!USE_API) return;
+            const userId = localStorage.getItem(STORAGE_USER_KEY) || DEFAULT_USER_ID;
+            const date = getLocalDateYmd();
+            const res = await fetch(`${API_ENDPOINT}/api/daily-report-draft?userId=${encodeURIComponent(userId)}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API_TOKEN}`
+                },
+                body: JSON.stringify({ date, report_text: text })
+            });
+            if (!res.ok) throw new Error(`save report failed: ${res.status}`);
+            return res.json();
+        }
+
+        function generateFootprint() {
+            const feedbackCard = document.getElementById('feedbackCard');
+            const footprintCard = document.getElementById('footprintCard');
+            const feedbackContent = document.getElementById('feedbackContent');
+            const footprintContent = document.getElementById('footprintContent');
+            const summaryText = '今週は「計画→実行→振り返り」の流れが安定しています。来週は「共有」を意識するとさらに伸びます。';
+            const summarySkill = '課題解決';
+            if (feedbackContent) {
+                feedbackContent.textContent = '直近の日報の傾向から、前向きな行動が継続できています。この調子で小さな達成を積み上げていきましょう。';
+            }
+            if (footprintContent) {
+                footprintContent.textContent = summaryText;
+            }
+            const footprints = JSON.parse(localStorage.getItem('footprints') || '[]');
+            const now = new Date();
+            const date = `${now.getMonth() + 1}/${now.getDate()}`;
+            const exists = footprints.some(fp => fp.type === 'summary' && fp.date === date && fp.text === summaryText);
+            if (!exists) {
+                footprints.push({
+                    text: summaryText,
+                    skill: summarySkill,
+                    emotion: '🌱',
+                    isPositive: true,
+                    isNegative: false,
+                    timestamp: now.getTime(),
+                    date,
+                    type: 'summary'
+                });
+                localStorage.setItem('footprints', JSON.stringify(footprints));
+            }
+            if (feedbackCard) feedbackCard.style.display = 'block';
+            if (footprintCard) footprintCard.style.display = 'block';
+        }
+
+        function shareFootprint() {
+            alert('🔥 あしあとを夜のたき火広場にシェアしました！');
+        }
+
+        function copyFootprint() {
+            const text = document.getElementById('footprintContent')?.textContent || '';
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('日報をコピーしました！');
             });
         }
         
@@ -583,21 +734,7 @@ ${insights}`;
                 
                 if (column.dataset.column === 'done') {
                     const skill = task.dataset.skill;
-                    skillLevel += 5;
-                    
-                    // レベルアップアニメーション
-                    const levelEl = document.getElementById('skillLevel');
-                    levelEl.classList.add('skill-level-up');
-                    setTimeout(() => {
-                        levelEl.textContent = `Lv.${skillLevel}`;
-                        levelEl.classList.remove('skill-level-up');
-                    }, 400);
-                    
-                    // レーダーチャートパルス
-                    const radar = document.querySelector('.skill-radar svg');
-                    radar.classList.add('radar-pulse');
-                    setTimeout(() => radar.classList.remove('radar-pulse'), 600);
-                    
+
                     // 風船アニメーション
                     const balloons = ['🎈', '🎉', '✨', '🌟', '💫'];
                     for (let i = 0; i < 8; i++) {
@@ -613,7 +750,7 @@ ${insights}`;
                         }, i * 100);
                     }
                     
-                    document.getElementById('aiMessage').innerHTML = `<strong>おめでとうございます！</strong><br>「${task.querySelector('.task-title').textContent}」を完了しました！${skill}スキルが+5pt上がりました🎉`;
+                    document.getElementById('aiMessage').innerHTML = `<strong>おめでとうございます！</strong><br>「${task.querySelector('.task-title').textContent}」を完了しました！`;
                 }
             }
         }
@@ -755,6 +892,10 @@ ${insights}`;
         window.postTweet = postTweet;
         window.generateReport = generateReport;
         window.copyReport = copyReport;
+        window.saveReport = saveReport;
+        window.generateFootprint = generateFootprint;
+        window.shareFootprint = shareFootprint;
+        window.copyFootprint = copyFootprint;
         window.allowDrop = allowDrop;
         window.drag = drag;
         window.drop = drop;

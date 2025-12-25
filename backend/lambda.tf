@@ -50,7 +50,8 @@ data "aws_iam_policy_document" "lambda_policy" {
     resources = [
       aws_dynamodb_table.tweets.arn,
       aws_dynamodb_table.tasks.arn,
-      aws_dynamodb_table.advice.arn
+      aws_dynamodb_table.advice.arn,
+      aws_dynamodb_table.daily_reports.arn
     ]
   }
 }
@@ -160,6 +161,7 @@ resource "aws_lambda_function" "tweets" {
       TABLE_NAME      = aws_dynamodb_table.tweets.name
       TASK_TABLE_NAME = aws_dynamodb_table.tasks.name
       ADVICE_TABLE_NAME = aws_dynamodb_table.advice.name
+      DAILY_REPORTS_TABLE_NAME = aws_dynamodb_table.daily_reports.name
       SHARED_TOKEN    = var.shared_token
       BEDROCK_MODEL_ID = var.bedrock_model_id
     }
@@ -329,6 +331,18 @@ resource "aws_apigatewayv2_route" "get_api_tasks" {
 resource "aws_apigatewayv2_route" "get_api_advice" {
   api_id    = aws_apigatewayv2_api.http.id
   route_key = "GET /api/advice"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "get_api_daily_reports" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "GET /api/daily-reports"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+}
+
+resource "aws_apigatewayv2_route" "put_api_daily_report_draft" {
+  api_id    = aws_apigatewayv2_api.http.id
+  route_key = "PUT /api/daily-report-draft"
   target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 

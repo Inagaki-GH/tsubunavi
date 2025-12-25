@@ -62,6 +62,12 @@ variable "dynamodb_advice_table_name" {
   default     = "tsubunavi-advice"
 }
 
+variable "dynamodb_daily_reports_table_name" {
+  description = "DynamoDB table name for daily tweet reports"
+  type        = string
+  default     = "tsubunavi-daily-reports"
+}
+
 variable "bedrock_model_id" {
   description = "Bedrock model ID for report generation"
   type        = string

@@ -143,3 +143,20 @@ resource "aws_dynamodb_table" "advice" {
     Env     = var.env
   }
 }
+
+resource "aws_dynamodb_table" "daily_reports" {
+  name         = var.dynamodb_daily_reports_table_name
+  billing_mode = "PAY_PER_REQUEST"
+
+  hash_key = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  tags = {
+    Project = var.project
+    Env     = var.env
+  }
+}

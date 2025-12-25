@@ -106,7 +106,7 @@
                 <a href="bonfire_premium.html" class="nav-btn">🔥 夜の焚火広場</a>
                 <a href="ai-test.html" class="nav-btn">🤖 AI機能テスト</a>
             </nav>
-            <div id="userName" style="font-weight: bold; color: #5D4037;">user_12345</div>
+            <div id="userName" style="font-weight: bold; color: #5D4037;">田中 健太</div>
         </header>
         
         <div class="card">
@@ -130,27 +130,11 @@
         <div class="main-content">
             <div>
                 <div class="card">
-                    <div class="card-title">📊 スキル状態</div>
-                    <div class="skill-radar">
-                        <svg width="240" height="240" viewBox="0 0 240 240">
-                            <defs>
-                                <linearGradient id="radarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" style="stop-color:#FFB74D;stop-opacity:0.6" />
-                                    <stop offset="100%" style="stop-color:#FF9800;stop-opacity:0.6" />
-                                </linearGradient>
-                            </defs>
-                            <polygon points="120,30 180,75 180,165 120,210 60,165 60,75" fill="none" stroke="#FFE0B2" stroke-width="3"/>
-                            <polygon points="120,60 150,90 150,150 120,180 90,150 90,90" fill="none" stroke="#FFCC80" stroke-width="3"/>
-                            <polygon id="skillPolygon" points="120,60 165,100 155,155 110,175 70,145 85,95" fill="url(#radarGradient)" stroke="#FF9800" stroke-width="3"/>
-                            <text x="120" y="25" text-anchor="middle" font-size="12" fill="#5D4037" font-weight="bold">コミュニケーション</text>
-                            <text x="195" y="95" text-anchor="start" font-size="12" fill="#5D4037" font-weight="bold">課題解決</text>
-                            <text x="195" y="160" text-anchor="start" font-size="12" fill="#5D4037" font-weight="bold">システム設計</text>
-                            <text x="120" y="225" text-anchor="middle" font-size="12" fill="#5D4037" font-weight="bold">リーダーシップ</text>
-                            <text x="35" y="160" text-anchor="end" font-size="12" fill="#5D4037" font-weight="bold">提案力</text>
-                            <text x="35" y="95" text-anchor="end" font-size="12" fill="#5D4037" font-weight="bold">判断力</text>
-                        </svg>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div class="card-title" style="margin-bottom: 0;">📚 過去の日報一覧</div>
+                        <button class="tweet-button" style="margin: 0; float: none;" onclick="generateFootprint()">👣 あしあと生成</button>
                     </div>
-                    <div class="skill-display">総合レベル: <span id="skillLevel">Lv.25</span></div>
+                    <div id="reportList"></div>
                 </div>
             </div>
             
@@ -196,8 +180,24 @@
         
         <div class="card" id="reportCard" style="display: none;">
             <div class="card-title">📄 日報下書き</div>
-            <div id="reportContent" style="white-space: pre-wrap; line-height: 1.8; color: #5D4037; background: #FFFBF5; padding: 20px; border-radius: 20px; border: 2px solid #FFE0B2;"></div>
-            <button class="tweet-button" style="margin-top: 15px;" onclick="copyReport()">📋 コピー</button>
+            <textarea id="reportContent" style="width: 100%; min-height: 300px; white-space: pre-wrap; line-height: 1.8; color: #5D4037; background: #FFFBF5; padding: 20px; border-radius: 20px; border: 2px solid #FFE0B2; font-family: 'Zen Maru Gothic', sans-serif; resize: vertical;"></textarea>
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button class="tweet-button" onclick="saveReport()">💾 保存</button>
+                <button class="tweet-button" onclick="copyReport()">📋 コピー</button>
+            </div>
+        </div>
+
+        <div class="card" id="feedbackCard" style="display: none;">
+            <div class="card-title">🎆 AIフィードバック</div>
+            <div id="feedbackContent" style="background: #E8F5E9; padding: 20px; border-radius: 20px; border: 2px solid #81C784; color: #2E7D32; line-height: 1.8;"></div>
+        </div>
+
+        <div class="card" id="footprintCard" style="display: none;">
+            <div class="card-title">👣 成長のあしあと</div>
+            <div id="footprintContent" style="background: #F3E5F5; padding: 20px; border-radius: 20px; border: 2px solid #BA68C8; color: #4A148C; line-height: 1.8;"></div>
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button class="tweet-button" onclick="shareFootprint()">🔥 シェアする</button>
+            </div>
         </div>
     </div>
     
@@ -211,7 +211,8 @@
     
     <script src="config.js"></script>
     <script src="js/footprints.js"></script>
-        <script src="js/home.js" defer></script>
+    <script src="js/user_header.js"></script>
+    <script src="js/home.js" defer></script>
 
 </body>
 </html>

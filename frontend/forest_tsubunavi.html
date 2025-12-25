@@ -41,7 +41,7 @@
             <a href="forest_tsubunavi.html" class="nav-btn active">🌲 あしあとと里</a>
             <a href="bonfire_premium.html" class="nav-btn">🔥 夜の焚火広場</a>
         </nav>
-        <div style="font-weight: bold; color: #5D4037;">田中 健太</div>
+        <div id="userName" style="font-weight: bold; color: #5D4037;">田中 健太</div>
     </header>
     
     <canvas id="canvas"></canvas>
@@ -68,6 +68,7 @@
         <div class="control-text">🖱️ クリック: 里を選択 | ESC: パネルを閉じる</div>
     </div>
     
+    <script src="js/user_header.js"></script>
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -348,6 +349,22 @@
             drawClouds();
             
             requestAnimationFrame(render);
+        }
+
+        function drawClouds() {
+            const clouds = [
+                { x: canvas.width * 0.15, y: canvas.height * 0.12, size: 38 },
+                { x: canvas.width * 0.45, y: canvas.height * 0.08, size: 46 },
+                { x: canvas.width * 0.75, y: canvas.height * 0.14, size: 34 }
+            ];
+            ctx.fillStyle = 'rgba(255,255,255,0.75)';
+            clouds.forEach((c) => {
+                ctx.beginPath();
+                ctx.ellipse(c.x, c.y, c.size, c.size * 0.6, 0, 0, Math.PI * 2);
+                ctx.ellipse(c.x - c.size * 0.6, c.y + c.size * 0.1, c.size * 0.6, c.size * 0.4, 0, 0, Math.PI * 2);
+                ctx.ellipse(c.x + c.size * 0.6, c.y + c.size * 0.1, c.size * 0.6, c.size * 0.4, 0, 0, Math.PI * 2);
+                ctx.fill();
+            });
         }
         
         function drawPlayer() {

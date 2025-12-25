@@ -7,6 +7,7 @@ const bedrock = new BedrockRuntime({ region: process.env.AWS_REGION || "us-east-
 const TABLE = process.env.TABLE_NAME;
 const TASK_TABLE = process.env.TASK_TABLE_NAME;
 const ADVICE_TABLE = process.env.ADVICE_TABLE_NAME;
+const DAILY_REPORTS_TABLE = process.env.DAILY_REPORTS_TABLE_NAME;
 const SHARED_TOKEN = process.env.SHARED_TOKEN;
 const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID || "anthropic.claude-3-5-sonnet-20240620-v1:0";
 const DEFAULT_USER_ID = "user_12345";
@@ -23,7 +24,7 @@ exports.handler = async (event) => {
         statusCode: 204,
         headers: {
           "Access-Control-Allow-Origin": event.headers?.origin || "*",
-          "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+          "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type,Authorization",
         },
       };
@@ -58,6 +59,10 @@ exports.handler = async (event) => {
           Item: tweetItem,
         })
         .promise();
+
+      if (DAILY_REPORTS_TABLE) {
+        await updateDailyReport(userId, timestamp);
+      }
 
       if (analysis.isTask && TASK_TABLE) {
         const taskItem = {
@@ -117,7 +122,7 @@ exports.handler = async (event) => {
     if (route === "/api/advice" && method === "GET") {
       if (!ADVICE_TABLE) return json(500, { message: "Advice table not configured" });
       const userId = event.queryStringParameters?.userId || DEFAULT_USER_ID;
-      const date = getJstDateString(Date.now());
+      const date = getJstDateYmd(Date.now());
       const adviceKey = `${userId}#${date}`;
 
       const existing = await client
@@ -147,6 +152,50 @@ exports.handler = async (event) => {
         })
         .promise();
       return json(200, item);
+    }
+
+    if (route === "/api/daily-report-draft" && method === "PUT") {
+      if (!DAILY_REPORTS_TABLE) return json(500, { message: "Daily reports table not configured" });
+      const userId = event.queryStringParameters?.userId || DEFAULT_USER_ID;
+      const body = parseBody(event.body, event.isBase64Encoded) || {};
+      const dateYmd = (body.date || getJstDateYmd(Date.now())).trim();
+      const dateKey = dateYmd.replace(/-/g, "");
+      const reportText = String(body.report_text || "").trim();
+      if (!reportText) return json(400, { message: "report_text is required" });
+      const id = `${userId}#${dateKey}`;
+      const now = formatJstTimestamp(new Date());
+      const res = await client
+        .update({
+          TableName: DAILY_REPORTS_TABLE,
+          Key: { id },
+          UpdateExpression:
+            "SET userId = if_not_exists(userId, :userId), #date = if_not_exists(#date, :date), report_text = :report_text, report_updated_at = :updated_at",
+          ExpressionAttributeNames: { "#date": "date" },
+          ExpressionAttributeValues: {
+            ":userId": userId,
+            ":date": dateYmd,
+            ":report_text": reportText,
+            ":updated_at": now,
+          },
+          ReturnValues: "ALL_NEW",
+        })
+        .promise();
+      return json(200, res.Attributes || {});
+    }
+
+    if (route === "/api/daily-reports" && method === "GET") {
+      if (!DAILY_REPORTS_TABLE) return json(500, { message: "Daily reports table not configured" });
+      const userId = event.queryStringParameters?.userId || DEFAULT_USER_ID;
+      const res = await client
+        .scan({
+          TableName: DAILY_REPORTS_TABLE,
+          Limit: 200,
+        })
+        .promise();
+      const items = (res.Items || [])
+        .filter((item) => item.userId === userId)
+        .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+      return json(200, items);
     }
 
     if (route.startsWith("/api/tasks/") && method === "PATCH") {
@@ -293,6 +342,10 @@ exports.handler = async (event) => {
         .promise();
       console.log("put result", putRes);
 
+      if (DAILY_REPORTS_TABLE) {
+        await updateDailyReport(userId, timestamp);
+      }
+
       return json(201, item);
     }
 
@@ -410,7 +463,7 @@ function formatJstTimestamp(date) {
   return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}+09:00`;
 }
 
-function getJstDateString(ms) {
+function getJstDateYmd(ms) {
   const jstMs = ms + 9 * 60 * 60 * 1000;
   return new Date(jstMs).toISOString().slice(0, 10);
 }
@@ -421,7 +474,7 @@ function json(statusCode, body) {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type,Authorization",
     },
     body: JSON.stringify(body),
@@ -436,6 +489,48 @@ function isAuthorized(headers = {}) {
   return token && token === SHARED_TOKEN;
 }
 
+async function updateDailyReport(userId, timestamp) {
+  if (!DAILY_REPORTS_TABLE) return;
+  const targetDate = getJstDateYmd(Date.parse(timestamp) || Date.now());
+  const dateKey = targetDate.replace(/-/g, "");
+  const res = await client
+    .scan({
+      TableName: TABLE,
+      Limit: 200,
+    })
+    .promise();
+  const items = (res.Items || []).filter((item) => {
+    if (!item || item.userId !== userId) return false;
+    if (!item.timestamp) return false;
+    const day = getJstDateYmd(Date.parse(item.timestamp) || 0);
+    return day === targetDate;
+  });
+  const total = items.length;
+  const positive = items.filter((i) => i.isPositive).length;
+  const negative = items.filter((i) => i.isNegative).length;
+  const tasks = items.filter((i) => i.isTask).length;
+  const pct = (count) => (total ? Math.round((count / total) * 100) : 0);
+  const reportItem = {
+    id: `${userId}#${dateKey}`,
+    userId,
+    date: targetDate,
+    total,
+    positive_count: positive,
+    negative_count: negative,
+    task_count: tasks,
+    positive_pct: pct(positive),
+    negative_pct: pct(negative),
+    task_pct: pct(tasks),
+    updated_at: formatJstTimestamp(new Date()),
+  };
+  await client
+    .put({
+      TableName: DAILY_REPORTS_TABLE,
+      Item: reportItem,
+    })
+    .promise();
+}
+
 async function fetchRecentMemoText(userId) {
   const res = await client
     .scan({
@@ -445,14 +540,14 @@ async function fetchRecentMemoText(userId) {
     .promise();
   const todayMs = Date.now();
   const last7Dates = new Set(
-    Array.from({ length: 7 }, (_, i) => getJstDateString(todayMs - i * 24 * 60 * 60 * 1000)),
+    Array.from({ length: 7 }, (_, i) => getJstDateYmd(todayMs - i * 24 * 60 * 60 * 1000)),
   );
   const items = (res.Items || []).filter((item) => {
     if (!item || item.userId !== userId) return false;
     const mode = (item.mode || "memo").toLowerCase();
     if (mode !== "memo") return false;
     if (!item.timestamp) return false;
-    const day = getJstDateString(Date.parse(item.timestamp) || 0);
+    const day = getJstDateYmd(Date.parse(item.timestamp) || 0);
     return last7Dates.has(day);
   });
   const texts = items.map((i) => `- ${i.text || ""}`).join("\n");

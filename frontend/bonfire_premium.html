@@ -10,7 +10,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Zen Maru Gothic', sans-serif; background: linear-gradient(135deg, #FFF8E1 0%, #FFE0B2 100%); min-height: 100vh; color: #5D4037; overflow-x: hidden; }
+        body { font-family: 'Zen Maru Gothic', sans-serif; background: linear-gradient(135deg, #0F0F23 0%, #1A1A3A 50%, #2D1B69 100%); min-height: 100vh; color: #5D4037; overflow-x: hidden; position: relative; }
+        .stars { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .star { position: absolute; background: white; border-radius: 50%; animation: twinkle 3s infinite; }
+        @keyframes twinkle { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 1; transform: scale(1.2); } }
+        .content { position: relative; z-index: 1; }
         header { background: #FFF; padding: 25px 40px; border-radius: 30px; box-shadow: 0 8px 24px rgba(255, 152, 0, 0.15); margin: 20px; display: flex; justify-content: space-between; align-items: center; }
         .logo { font-size: 32px; font-weight: bold; color: #FF9800; }
         nav { display: flex; gap: 15px; }
@@ -22,7 +26,20 @@
         @keyframes bonfire-flicker { 0%, 100% { transform: scale(1) rotate(-2deg); filter: drop-shadow(0 0 30px rgba(255,152,0,0.6)); } 50% { transform: scale(1.05) rotate(2deg); filter: drop-shadow(0 0 40px rgba(255,152,0,0.8)); } }
         .scene-title { text-align: center; font-size: 42px; font-weight: bold; margin-bottom: 15px; color: #FF9800; }
         .scene-subtitle { text-align: center; font-size: 16px; color: #666; margin-bottom: 40px; line-height: 1.8; }
-        .sections { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .footprint-board { background: #FFF; border-radius: 30px; padding: 40px; box-shadow: 0 8px 24px rgba(186, 104, 200, 0.15); margin-bottom: 30px; transition: all 0.3s; }
+        .footprint-board:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(186, 104, 200, 0.2); }
+        .sections { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .footprint-card { background: #F3E5F5; border-radius: 25px; padding: 20px; margin-bottom: 15px; border: 2px solid #BA68C8; transition: all 0.3s; cursor: pointer; }
+        .footprint-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(186, 104, 200, 0.2); }
+        .footprint-card.expanded { border-color: #9C27B0; box-shadow: 0 8px 24px rgba(186, 104, 200, 0.3); }
+        .footprint-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .footprint-user { font-weight: bold; color: #4A148C; }
+        .footprint-date { font-size: 12px; color: #999; }
+        .footprint-summary { color: #4A148C; font-size: 14px; font-weight: 500; }
+        .footprint-content { color: #4A148C; font-size: 14px; line-height: 1.6; margin-top: 15px; display: none; }
+        .footprint-content.expanded { display: block; }
+        .expand-icon { color: #BA68C8; font-size: 18px; transition: transform 0.3s; }
+        .expand-icon.expanded { transform: rotate(180deg); }
         .section { background: #FFF; border-radius: 30px; padding: 40px; box-shadow: 0 8px 24px rgba(255, 152, 0, 0.1); transition: all 0.3s; }
         .section:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(255, 152, 0, 0.15); }
         .section-title { font-size: 24px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; color: #FF9800; }
@@ -47,6 +64,7 @@
     </style>
 </head>
 <body>
+    <div class="stars"></div>
     <div class="content">
         <header>
             <div class="logo">💬 つぶナビ</div>
@@ -68,7 +86,21 @@
                 ここでは、誰もが温かく迎えられます。
             </div>
             
+            <div class="footprint-board">
+                <div class="section-title">
+                    <span>👣</span>
+                    <span>成長のあしあと</span>
+                </div>
+                <div style="margin-bottom: 20px; font-size: 14px; color: #666;">
+                    他のユーザーがシェアした成長の軌跡です
+                </div>
+                <div id="sharedFootprints">
+                    <!-- シェアされたあしあとがここに表示されます -->
+                </div>
+            </div>
+            
             <div class="sections">
+                
                 <div class="section">
                     <div class="section-title">
                         <span>✨</span>
@@ -90,7 +122,6 @@
                         <div class="person-skills">
                             <span class="skill-badge">コミュニケーション Lv.8</span>
                             <span class="skill-badge">課題解決 Lv.7</span>
-                            <span class="skill-badge">リーダーシップ Lv.8</span>
                         </div>
                         <div style="font-size: 14px; margin-bottom: 15px; color: #666; line-height: 1.6;">
                             「エンジニアからPMへの転向。技術力だけでなく、コミュニケーション力が重要でした。」
@@ -110,30 +141,9 @@
                         <div class="person-skills">
                             <span class="skill-badge">コミュニケーション Lv.9</span>
                             <span class="skill-badge">提案力 Lv.8</span>
-                            <span class="skill-badge">顧客対応 Lv.8</span>
                         </div>
                         <div style="font-size: 14px; margin-bottom: 15px; color: #666; line-height: 1.6;">
                             「育児と仕事の両立。時間管理とコミュニケーションが鍵でした。」
-                        </div>
-                        <button class="action-button">💬 話してみる</button>
-                    </div>
-                    
-                    <div class="person-card">
-                        <div class="person-header">
-                            <div class="person-avatar">🧑</div>
-                            <div class="person-info">
-                                <div class="person-name">鈴木 一郎</div>
-                                <div class="person-role">テックリード・入社7年目</div>
-                            </div>
-                            <div class="similarity-badge">類似度 78%</div>
-                        </div>
-                        <div class="person-skills">
-                            <span class="skill-badge">システム設計 Lv.9</span>
-                            <span class="skill-badge">技術学習 Lv.8</span>
-                            <span class="skill-badge">リーダーシップ Lv.7</span>
-                        </div>
-                        <div style="font-size: 14px; margin-bottom: 15px; color: #666; line-height: 1.6;">
-                            「技術を極めながらチームをリードする。両立の秘訣をお話しします。」
                         </div>
                         <button class="action-button">💬 話してみる</button>
                     </div>
@@ -158,12 +168,10 @@
                         </div>
                         <div style="font-size: 14px; color: #666; margin-bottom: 15px; line-height: 1.8;">
                             📋 待機中のタスク: 8件<br>
-                            ⏰ 放置タスク: 3件（1週間以上）<br>
                             😰 最近の感情: 不安、焦り
                         </div>
                         <div class="support-buttons">
                             <button class="support-button">💪 がんばれ</button>
-                            <button class="support-button">🔥 負けるな</button>
                             <button class="support-button">🌟 応援してる</button>
                         </div>
                     </div>
@@ -178,32 +186,10 @@
                         </div>
                         <div style="font-size: 14px; color: #666; margin-bottom: 15px; line-height: 1.8;">
                             📋 待機中のタスク: 12件<br>
-                            ⏰ 放置タスク: 5件（2週間以上）<br>
                             😔 最近の感情: 疲労、孤独
                         </div>
                         <div class="support-buttons">
                             <button class="support-button">💪 がんばれ</button>
-                            <button class="support-button">🔥 負けるな</button>
-                            <button class="support-button">🌟 応援してる</button>
-                        </div>
-                    </div>
-                    
-                    <div class="sheep-card">
-                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                            <div style="font-size: 45px;">🐑</div>
-                            <div>
-                                <div style="font-weight: bold; font-size: 16px; color: #5D4037;">匿名の仲間 C</div>
-                                <div style="font-size: 12px; color: #999;">人事・入社3年目</div>
-                            </div>
-                        </div>
-                        <div style="font-size: 14px; color: #666; margin-bottom: 15px; line-height: 1.8;">
-                            📋 待機中のタスク: 6件<br>
-                            ⏰ 放置タスク: 2件（1週間以上）<br>
-                            😓 最近の感情: プレッシャー、不安
-                        </div>
-                        <div class="support-buttons">
-                            <button class="support-button">💪 がんばれ</button>
-                            <button class="support-button">🔥 負けるな</button>
                             <button class="support-button">🌟 応援してる</button>
                         </div>
                     </div>
@@ -217,6 +203,123 @@
     </div>
     
     <script>
+        // 星空を生成
+        function createStars() {
+            const starsContainer = document.querySelector('.stars');
+            const starCount = 100;
+            
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.width = star.style.height = (Math.random() * 3 + 1) + 'px';
+                star.style.animationDelay = Math.random() * 3 + 's';
+                starsContainer.appendChild(star);
+            }
+        }
+        
+        // シェアされたあしあとを読み込んで表示
+        function loadSharedFootprints() {
+            const sharedFootprints = JSON.parse(localStorage.getItem('sharedFootprints') || '[]');
+            const container = document.getElementById('sharedFootprints');
+            
+            if (sharedFootprints.length === 0) {
+                // デフォルトのサンプルデータを追加
+                const sampleFootprints = [
+                    {
+                        id: 1,
+                        userName: '山田 太郎',
+                        timestamp: '2024/01/15 14:30',
+                        summary: '🌱 バランスの取れた成長を続けています',
+                        content: `
+                            <div style="margin-bottom: 10px;">
+                                過去1週間の3件の日報を分析した結果、ポジティブとネガティブの要素がバランスよく存在し、健全な成長プロセスを歩んでいることがわかります。
+                            </div>
+                            <div style="padding: 10px; background: #E3F2FD; border-radius: 10px; border-left: 4px solid #2196F3;">
+                                <strong>🎆 総合評価:</strong> 着実な成長を続けており、今後もこのペースで継続することで、安定したスキル向上が期待できます。
+                            </div>
+                        `
+                    },
+                    {
+                        id: 2,
+                        userName: '佐藤 美咲',
+                        timestamp: '2024/01/14 16:45',
+                        summary: '🌱 成長の軌跡が明確に見えています',
+                        content: `
+                            <div style="margin-bottom: 10px;">
+                                過去1週間の4件の日報を分析した結果、ポジティブな要素が75%を占めており、着実な成長を遂げていることがわかります。
+                            </div>
+                            <div style="padding: 10px; background: #E8F5E9; border-radius: 10px; border-left: 4px solid #4CAF50;">
+                                <strong>🎆 総合評価:</strong> 現在の成長ペースは非常に良好です。この調子で継続することで、さらなるスキル向上が期待できます。
+                            </div>
+                        `
+                    },
+                    {
+                        id: 3,
+                        userName: '鈴木 一郎',
+                        timestamp: '2024/01/13 11:20',
+                        summary: '🌱 挑戦と成長の時期を乗り越えています',
+                        content: `
+                            <div style="margin-bottom: 10px;">
+                                過去1週間の5件の日報を分析した結果、困難な課題に直面しながらも、それを成長の機会として捉えている姿勢が見られます。
+                            </div>
+                            <div style="padding: 10px; background: #FFF3E0; border-radius: 10px; border-left: 4px solid #FF9800;">
+                                <strong>🎆 総合評価:</strong> 現在は挑戦的な時期ですが、この経験が将来の大きな成長の土台となります。
+                            </div>
+                        `
+                    }
+                ];
+                
+                localStorage.setItem('sharedFootprints', JSON.stringify(sampleFootprints));
+                loadSharedFootprints(); // 再帰呼び出し
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            sharedFootprints.forEach(footprint => {
+                const footprintDiv = document.createElement('div');
+                footprintDiv.className = 'footprint-card';
+                footprintDiv.innerHTML = `
+                    <div class="footprint-header">
+                        <div>
+                            <div class="footprint-user">👣 ${footprint.userName}</div>
+                            <div class="footprint-date">${footprint.timestamp}</div>
+                        </div>
+                        <div class="expand-icon">▼</div>
+                    </div>
+                    <div class="footprint-summary">${footprint.summary}</div>
+                    <div class="footprint-content">
+                        ${footprint.content}
+                    </div>
+                `;
+                
+                footprintDiv.addEventListener('click', function() {
+                    const content = this.querySelector('.footprint-content');
+                    const icon = this.querySelector('.expand-icon');
+                    
+                    if (content.classList.contains('expanded')) {
+                        content.classList.remove('expanded');
+                        icon.classList.remove('expanded');
+                        this.classList.remove('expanded');
+                    } else {
+                        content.classList.add('expanded');
+                        icon.classList.add('expanded');
+                        this.classList.add('expanded');
+                    }
+                });
+                
+                container.appendChild(footprintDiv);
+            });
+        }
+        
+        // ページ読み込み時に実行
+        document.addEventListener('DOMContentLoaded', function() {
+            createStars();
+            loadSharedFootprints();
+        });
+        
         document.querySelectorAll('.support-button').forEach(button => {
             button.addEventListener('click', function() {
                 // エールをlocalStorageに保存（匿名）

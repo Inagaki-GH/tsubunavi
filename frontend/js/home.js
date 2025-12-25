@@ -156,8 +156,8 @@
         
         function fallbackAnalysis(text) {
             const isTask = /作る|作成|対応|準備|実施|やる|する|しないと|まで/.test(text);
-            const isPositive = /嬉しい|楽しい|良い|成功|できた|頑張|ありがと/.test(text);
-            const isNegative = /難しい|困|大変|疲|辛|できない|わからない/.test(text);
+            const isPositive = /嬉しい|楽しい|良い|成功|できた|頑張|ありがと|完了|順調|うまく|よかった|理解/.test(text);
+            const isNegative = /難しい|困|大変|疲|辛|できない|わからない|苦手|問題|エラー|失敗|うまくいかない/.test(text);
             return { isTask, isPositive, isNegative };
         }
         
@@ -371,6 +371,11 @@
                 return false;
             });
             
+            if (todaysTweets.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">今日のつぶやきはまだありません</div>';
+                return;
+            }
+            
             todaysTweets.forEach(tweet => {
                 const item = document.createElement('div');
                 item.className = 'tweet-item';
@@ -582,38 +587,7 @@ ${insights}`;
                 }
                 
                 if (column.dataset.column === 'done') {
-                    const skill = task.dataset.skill;
-                    skillLevel += 5;
-                    
-                    // レベルアップアニメーション
-                    const levelEl = document.getElementById('skillLevel');
-                    levelEl.classList.add('skill-level-up');
-                    setTimeout(() => {
-                        levelEl.textContent = `Lv.${skillLevel}`;
-                        levelEl.classList.remove('skill-level-up');
-                    }, 400);
-                    
-                    // レーダーチャートパルス
-                    const radar = document.querySelector('.skill-radar svg');
-                    radar.classList.add('radar-pulse');
-                    setTimeout(() => radar.classList.remove('radar-pulse'), 600);
-                    
-                    // 風船アニメーション
-                    const balloons = ['🎈', '🎉', '✨', '🌟', '💫'];
-                    for (let i = 0; i < 8; i++) {
-                        setTimeout(() => {
-                            const balloon = document.createElement('div');
-                            balloon.className = 'balloon';
-                            balloon.textContent = balloons[Math.floor(Math.random() * balloons.length)];
-                            balloon.style.left = Math.random() * window.innerWidth + 'px';
-                            balloon.style.bottom = '0px';
-                            balloon.style.animationDelay = Math.random() * 0.5 + 's';
-                            document.body.appendChild(balloon);
-                            setTimeout(() => balloon.remove(), 3000);
-                        }, i * 100);
-                    }
-                    
-                    document.getElementById('aiMessage').innerHTML = `<strong>おめでとうございます！</strong><br>「${task.querySelector('.task-title').textContent}」を完了しました！${skill}スキルが+5pt上がりました🎉`;
+                    document.getElementById('aiMessage').innerHTML = `<strong>おめでとうございます！</strong><br>「${task.querySelector('.task-title').textContent}」を完了しました！`;
                 }
             }
         }
@@ -751,16 +725,255 @@ ${insights}`;
             }
         }, 2000);
 
-        // Expose handlers used by inline HTML
-        window.postTweet = postTweet;
-        window.generateReport = generateReport;
-        window.copyReport = copyReport;
-        window.allowDrop = allowDrop;
-        window.drag = drag;
-        window.drop = drop;
-        window.closeJourney = closeJourney;
-        window.approveRequest = approveRequest;
-        window.rejectRequest = rejectRequest;
-        window.stopSharing = stopSharing;
+        // 過去の日報を表示する関数
+        function viewReport(date) {
+            const reports = {
+                '2024-01-15': {
+                    title: '2024年1月15日の日報',
+                    content: `■今日のスケジュール
+09:00-10:00 チームミーティング
+10:00-12:00 API設計書作成
+13:00-15:00 コードレビュー
+15:00-17:00 課題対応
+
+■取り組んだこと
+・API設計書の作成を完了しました
+・システム設計スキルの向上に取り組みました
+・チームとの連携を強化しました
+
+■気づき
+・設計段階での詳細な検討が重要であることを再認識しました
+・チームメンバーとの早期相談により、効率的に作業を進められました`
+                },
+                '2024-01-14': {
+                    title: '2024年1月14日の日報',
+                    content: `■今日のスケジュール
+09:00-10:00 朝会
+10:00-12:00 開発作業
+13:00-15:00 チーム会議
+15:00-17:00 ドキュメント整理
+
+■取り組んだこと
+・チーム会議でプロジェクト進捗を共有しました
+・コミュニケーション力の向上に努めました
+・開発タスクを順調に進めました
+
+■気づき
+・定期的な進捗共有により、チーム全体の方向性を統一できました
+・積極的な発言により、チームへの貢献度が向上しました`
+                },
+                '2024-01-13': {
+                    title: '2024年1月13日の日報',
+                    content: `■今日のスケジュール
+09:00-10:00 技術調査
+10:00-12:00 新フレームワーク学習
+13:00-15:00 実装検討
+15:00-17:00 資料作成
+
+■取り組んだこと
+・新フレームワークの調査を開始しました
+・技術学習への取り組みを強化しました
+・実装方針の検討を行いました
+
+■気づき
+・新技術の習得には継続的な学習が重要であることを実感しました
+・実装前の十分な調査により、後の作業効率が大きく向上することを確認しました`
+                }
+            };
+            
+            const report = reports[date];
+            if (report) {
+                document.getElementById('reportContent').value = report.content;
+                document.getElementById('reportCard').style.display = 'block';
+                document.getElementById('reportCard').scrollIntoView({ behavior: 'smooth' });
+                
+                // タイトルを更新
+                const titleEl = document.querySelector('#reportCard .card-title');
+                if (titleEl) {
+                    titleEl.textContent = `📄 ${report.title}`;
+                }
+            }
+        }
+        
+        // 日報を保存する関数
+        function saveReport() {
+            const content = document.getElementById('reportContent').value;
+            if (!content.trim()) {
+                alert('日報の内容を入力してください。');
+                return;
+            }
+            
+            const today = new Date();
+            const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const title = generateReportTitle(content);
+            
+            // ローカルストレージに保存
+            const savedReports = JSON.parse(localStorage.getItem('savedReports') || '{}');
+            savedReports[dateStr] = {
+                title: title,
+                content: content,
+                date: dateStr,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('savedReports', JSON.stringify(savedReports));
+            
+            // 成功メッセージ
+            alert('日報を保存しました！');
+            
+            // AIフィードバックを生成・表示
+            generateAIFeedback(content);
+            
+            // 過去日報一覧を更新
+            loadSavedReports();
+        }
+        
+        // 日報タイトルを生成する関数
+        function generateReportTitle(content) {
+            const titles = [
+                'システム設計スキル向上への取り組み',
+                'チームコミュニケーション強化の一日',
+                '技術学習と実装検討の成果',
+                'プロジェクト進捗と課題解決',
+                '新技術習得への挑戦',
+                'コードレビューと品質向上',
+                'API設計とアーキテクチャ検討',
+                'チーム連携と効率化の実践'
+            ];
+            
+            // 内容に基づいてタイトルを選択（簡易版）
+            if (content.includes('API') || content.includes('設計')) {
+                return 'API設計とシステム開発の進展';
+            } else if (content.includes('チーム') || content.includes('会議')) {
+                return 'チームコミュニケーション強化の一日';
+            } else if (content.includes('学習') || content.includes('調査')) {
+                return '技術学習と知識向上への取り組み';
+            } else {
+                return titles[Math.floor(Math.random() * titles.length)];
+            }
+        }
+        
+        // AIフィードバックを生成する関数
+        function generateAIFeedback(content) {
+            const feedbacks = [
+                {
+                    point: '継続的な学習姿勢',
+                    comment: '新しい技術や知識の習得に積極的に取り組んでいる姿勢が素晴らしいです。この継続的な学習意欲は、長期的なキャリア成長の基盤となります。'
+                },
+                {
+                    point: 'チームワークの向上',
+                    comment: 'チームメンバーとの連携や情報共有を重視している点が評価できます。良好なコミュニケーションは、プロジェクト成功の重要な要素です。'
+                },
+                {
+                    point: '問題解決能力の発揮',
+                    comment: '課題に対して論理的にアプローチし、解決策を見つけ出す能力が向上しています。この分析力は今後の複雑な問題解決に活かされるでしょう。'
+                },
+                {
+                    point: '自己反省と改善意識',
+                    comment: '自分の行動や成果を客観視し、改善点を見つけ出す姿勢が見られます。この振り返りの習慣は、継続的な成長を促進します。'
+                }
+            ];
+            
+            // 内容に基づいてフィードバックを選択
+            let selectedFeedback;
+            if (content.includes('学習') || content.includes('調査')) {
+                selectedFeedback = feedbacks[0];
+            } else if (content.includes('チーム') || content.includes('会議')) {
+                selectedFeedback = feedbacks[1];
+            } else if (content.includes('課題') || content.includes('解決')) {
+                selectedFeedback = feedbacks[2];
+            } else {
+                selectedFeedback = feedbacks[3];
+            }
+            
+            const feedbackHtml = `
+                <div style="margin-bottom: 15px;">
+                    <strong>🌟 成長ポイント: ${selectedFeedback.point}</strong>
+                </div>
+                <div>${selectedFeedback.comment}</div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 2px solid #C8E6C9; font-size: 14px; color: #66BB6A;">
+                    💡 今後も継続的な振り返りと改善を心がけることで、さらなる成長が期待できます。
+                </div>
+            `;
+            
+            document.getElementById('feedbackContent').innerHTML = feedbackHtml;
+            document.getElementById('feedbackCard').style.display = 'block';
+            document.getElementById('feedbackCard').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // 保存された日報を読み込む関数
+        function loadSavedReports() {
+            const savedReports = JSON.parse(localStorage.getItem('savedReports') || '{}');
+            const reportList = document.getElementById('reportList');
+            
+            // 既存のリストをクリア
+            reportList.innerHTML = '';
+            
+            // 日付順にソート（新しい順）
+            const sortedReports = Object.values(savedReports).sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            sortedReports.forEach(report => {
+                const reportDiv = document.createElement('div');
+                reportDiv.className = 'report-item';
+                reportDiv.innerHTML = `
+                    <div onclick="toggleReportContent('${report.date}')" style="cursor: pointer;">
+                        <div style="color: #FF9800; font-weight: bold; margin-bottom: 5px;">
+                            ${report.date.replace(/-/g, '/')} ${report.title}
+                        </div>
+                    </div>
+                    <div id="content-${report.date}" class="report-content">
+                        ${report.content.replace(/\n/g, '<br>')}
+                    </div>
+                `;
+                reportList.appendChild(reportDiv);
+            });
+            
+            // デフォルトデータがない場合は追加
+            if (sortedReports.length === 0) {
+                addDefaultReports();
+            }
+        }
+        
+        // 日報内容の表示/非表示を切り替える関数
+        function toggleReportContent(date) {
+            const contentDiv = document.getElementById(`content-${date}`);
+            if (contentDiv) {
+                contentDiv.style.display = contentDiv.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+        
+        // デフォルトの日報データを追加する関数
+        function addDefaultReports() {
+            const defaultReports = {
+                '2024-01-15': {
+                    title: 'API設計とシステム開発の進展',
+                    content: '■今日のスケジュール\n09:00-10:00 チームミーティング\n10:00-12:00 API設計書作成\n13:00-15:00 コードレビュー\n15:00-17:00 課題対応\n\n■取り組んだこと\n・API設計書の作成を完了しました\n・システム設計スキルの向上に取り組みました\n・チームとの連携を強化しました\n\n■気づき\n・設計段階での詳細な検討が重要であることを再認識しました\n・チームメンバーとの早期相談により、効率的に作業を進められました',
+                    date: '2024-01-15',
+                    timestamp: Date.now() - 86400000
+                },
+                '2024-01-14': {
+                    title: 'チームコミュニケーション強化の一日',
+                    content: '■今日のスケジュール\n09:00-10:00 朝会\n10:00-12:00 開発作業\n13:00-15:00 チーム会議\n15:00-17:00 ドキュメント整理\n\n■取り組んだこと\n・チーム会議でプロジェクト進捗を共有しました\n・コミュニケーション力の向上に努めました\n・開発タスクを順調に進めました\n\n■気づき\n・定期的な進捗共有により、チーム全体の方向性を統一できました\n・積極的な発言により、チームへの貢献度が向上しました',
+                    date: '2024-01-14',
+                    timestamp: Date.now() - 172800000
+                },
+                '2024-01-13': {
+                    title: '技術学習と知識向上への取り組み',
+                    content: '■今日のスケジュール\n09:00-10:00 技術調査\n10:00-12:00 新フレームワーク学習\n13:00-15:00 実装検討\n15:00-17:00 資料作成\n\n■取り組んだこと\n・新フレームワークの調査を開始しました\n・技術学習への取り組みを強化しました\n・実装方針の検討を行いました\n\n■気づき\n・新技術の習得には継続的な学習が重要であることを実感しました\n・実装前の十分な調査により、後の作業効率が大きく向上することを確認しました',
+                    date: '2024-01-13',
+                    timestamp: Date.now() - 259200000
+                }
+            };
+            
+            localStorage.setItem('savedReports', JSON.stringify(defaultReports));
+            loadSavedReports();
+        }
+        window.viewReport = viewReport;
+        window.saveReport = saveReport;
+        window.toggleReportContent = toggleReportContent;
+        
+        // ページ読み込み時に過去日報を読み込み
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSavedReports();
+        });
     })();
     

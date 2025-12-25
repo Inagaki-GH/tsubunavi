@@ -106,15 +106,65 @@
         
         // localStorageからあしあとを読み込み
         function loadFootprints() {
-            const saved = JSON.parse(localStorage.getItem('footprints') || '[]');
             footprints.length = 0;
-            saved.forEach(fp => {
-                fp.userId = 'user_12345';
-                fp.userName = '田中 健太';
-                footprints.push(fp);
+            
+            // ホームで生成されたあしあとを読み込み
+            const savedReports = JSON.parse(localStorage.getItem('savedReports') || '{}');
+            Object.values(savedReports).forEach(report => {
+                // 日報からあしあとを生成
+                const footprint = {
+                    userId: 'user_12345',
+                    userName: '田中 健太',
+                    date: report.date,
+                    title: report.title || 'API設計とシステム開発の進展',
+                    activity: report.title,
+                    text: report.content || '今日はAPI設計書の作成を完了しました。設計段階での詳細な検討が重要であることを再認識しました。',
+                    skill: extractSkillFromReport(report),
+                    emotion: '👣',
+                    isPositive: report.content.includes('順調') || report.content.includes('完了') || report.content.includes('成功'),
+                    isNegative: report.content.includes('困難') || report.content.includes('問題') || report.content.includes('失敗')
+                };
+                footprints.push(footprint);
             });
             
-            // 公開された他人のあしあと
+            // デフォルトのあしあとデータを追加（データがない場合）
+            if (Object.keys(savedReports).length === 0) {
+                const defaultFootprints = [
+                    {
+                        userId: 'user_12345',
+                        userName: '田中 健太',
+                        date: '2024-01-15',
+                        title: 'API設計とシステム開発の進展',
+                        activity: 'API設計書の作成を完了',
+                        text: '今日はAPI設計書の作成を完了しました。設計段階での詳細な検討が重要であることを再認識しました。チームとの連携もスムーズに進み、次のフェーズに向けた準備が整いました。',
+                        skill: 'システム設計',
+                        emotion: '👣',
+                        isPositive: true
+                    },
+                    {
+                        userId: 'user_12345',
+                        userName: '田中 健太',
+                        date: '2024-01-14',
+                        title: 'チームコミュニケーション強化の一日',
+                        activity: 'チームミーティングでの議論',
+                        text: 'チームミーティングで活発な議論ができました。メンバーとの意見交換を通じて、新しい視点を得ることができ、プロジェクトの方向性がより明確になりました。',
+                        skill: 'コミュニケーション',
+                        emotion: '👣',
+                        isPositive: true
+                    }
+                ];
+                defaultFootprints.forEach(fp => footprints.push(fp));
+            }
+            
+            // 公開されたあしあとを読み込み
+            const publicFootprints = JSON.parse(localStorage.getItem('publicFootprints') || '[]');
+            publicFootprints.forEach(fp => {
+                if (fp.isPublic && fp.userId !== 'user_12345') {
+                    footprints.push(fp);
+                }
+            });
+            
+            // 公開された他人のあしあと（デフォルトデータ）
             const approvals = JSON.parse(localStorage.getItem('footprintApprovals') || '{}');
             const approvedUsers = Object.keys(approvals).filter(key => approvals[key].approved);
             
@@ -127,6 +177,28 @@
                 ];
                 sharedFootprints.forEach(fp => footprints.push(fp));
             }
+        }
+        
+        // 日報からスキルを抽出
+        function extractSkillFromReport(report) {
+            const content = report.content.toLowerCase();
+            if (content.includes('api') || content.includes('設計')) return 'システム設計';
+            if (content.includes('チーム') || content.includes('会議')) return 'コミュニケーション';
+            if (content.includes('学習') || content.includes('調査')) return '技術学習';
+            if (content.includes('提案') || content.includes('アイデア')) return '提案力';
+            if (content.includes('解決') || content.includes('課題')) return '課題解決';
+            return 'コミュニケーション'; // デフォルト
+        }
+        
+        // 日報からスキルを抽出
+        function extractSkillFromReport(report) {
+            const content = report.content.toLowerCase();
+            if (content.includes('api') || content.includes('設計')) return 'システム設計';
+            if (content.includes('チーム') || content.includes('会議')) return 'コミュニケーション';
+            if (content.includes('学習') || content.includes('調査')) return '技術学習';
+            if (content.includes('提案') || content.includes('アイデア')) return '提案力';
+            if (content.includes('解決') || content.includes('課題')) return '課題解決';
+            return 'コミュニケーション'; // デフォルト
         }
         
         loadFootprints();
@@ -186,6 +258,22 @@
                     if (fp.isPositive) color = '#81C784';
                     if (fp.isNegative) color = '#EF5350';
                     
+                    // 公開されたあしあとは特別な表示
+                    if (fp.isPublic && fp.userId !== 'user_12345') {
+                        // 光る輪を追加
+                        ctx.strokeStyle = '#FFD700';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.arc(x, y, 25, 0, Math.PI * 2);
+                        ctx.stroke();
+                        
+                        // 公開マーク
+                        ctx.font = '16px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('👤', x - 15, y - 15);
+                    }
+                    
                     // 光る円
                     ctx.fillStyle = color;
                     ctx.beginPath();
@@ -196,7 +284,7 @@
                     ctx.font = '22px Arial';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(fp.emotion, x, y);
+                    ctx.fillText(fp.emotion || '👣', x, y);
                     
                     // クリック可能なエリアを保存
                     fp.x = x;
@@ -454,12 +542,13 @@
                 const tooltip = document.createElement('div');
                 tooltip.innerHTML = `
                     <div style="font-weight: bold; margin-bottom: 8px;">${fp.emotion} ${fp.date}</div>
+                    <div style="font-weight: bold; margin-bottom: 8px; color: #FF9800;">${fp.title}</div>
                     <div style="margin-bottom: 8px;">${fp.text}</div>
                     <div style="font-size: 12px; color: #FF9800;">スキル: ${fp.skill}</div>
                 `;
                 tooltip.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.98); color: #5D4037; padding: 20px 30px; border-radius: 20px; font-size: 14px; z-index: 9999; box-shadow: 0 20px 60px rgba(255, 152, 0, 0.5); border: 3px solid #FFB74D; max-width: 400px; line-height: 1.6;';
                 document.body.appendChild(tooltip);
-                setTimeout(() => tooltip.remove(), 3000);
+                setTimeout(() => tooltip.remove(), 4000);
             } else {
                 // 他人のあしあと - 軌跡スレッドを表示
                 showJourneyThread(fp.userName, fp.userId);
